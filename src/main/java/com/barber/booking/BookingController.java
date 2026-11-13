@@ -54,6 +54,9 @@ public class BookingController {
         if (slot.isBooked()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu saat artıq tutulub");
         }
+        if (slot.getStartTime().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Keçmiş vaxta rezerv olmaz");
+        }
         slot.book(req.name(), req.phone());
         return new SlotDto(slot.getId(), slot.getStartTime());
     }
