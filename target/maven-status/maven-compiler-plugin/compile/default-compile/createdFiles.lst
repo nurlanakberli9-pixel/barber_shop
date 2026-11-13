@@ -1,5 +1,9 @@
 com/barber/booking/BookingApplication.class
-com/barber/booking/Slot.class
 com/barber/booking/Barbershop.class
 com/barber/booking/BarbershopRepository.class
+com/barber/booking/BookingController$BookRequest.class
+com/barber/booking/BookingController$ShopDto.class
+com/barber/booking/BookingController$SlotDto.class
+com/barber/booking/Slot.class
+com/barber/booking/BookingController.class
 com/barber/booking/SlotRepository.class

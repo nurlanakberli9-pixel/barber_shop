@@ -1,5 +1,6 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/Barbershop.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BarbershopRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingApplication.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/BookingController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Slot.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SlotRepository.java
