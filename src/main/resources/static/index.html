@@ -3,107 +3,219 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bərbər rezerv</title>
+<title>BarberConnect</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,sans-serif;background:#f4f4f6;color:#1c1c1e}
-header{background:#1c1c1e;color:#fff;padding:16px;font-size:20px;font-weight:600}
-main{max-width:480px;margin:0 auto;padding:16px}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.shop{cursor:pointer}
-.shop b{display:block;font-size:17px}
-.shop span{color:#666;font-size:14px}
-button,input{font:inherit;border-radius:10px;border:1px solid #ccc;padding:12px;width:100%;margin-top:8px}
-button{background:#1c1c1e;color:#fff;border:0;cursor:pointer}
-button:disabled{opacity:.5}
-button.link{background:none;color:#06c;width:auto;padding:0;margin:0 0 12px}
-.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.slots button{margin:0;padding:12px 0}
-.msg{padding:12px;border-radius:10px;margin-bottom:12px}
-.ok{background:#d9f5e0;color:#146c2e}
-.err{background:#fde2e2;color:#a11}
+body{margin:0;font-family:system-ui,sans-serif;background:#eef0f4;color:#1c2536}
+header{background:#fff;padding:14px 16px;font-size:20px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08);position:sticky;top:0;z-index:5}
+main{max-width:960px;margin:0 auto;padding:16px}
+.hero{background:#3f5470;color:#fff;border-radius:14px;padding:18px;margin-bottom:16px}
+.hero h1{margin:0 0 12px;font-size:20px;text-align:center}
+.hero input{width:100%;border:0;border-radius:10px;padding:12px;font:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);text-align:center;padding-bottom:12px;cursor:pointer}
+.card .top{background:#3f5470;height:46px}
+.avatar{width:72px;height:72px;border-radius:50%;color:#fff;font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:-36px auto 8px;border:3px solid #fff}
+.card b{display:block;font-size:16px}
+.card .shop{font-size:13px;color:#555;padding:0 8px;min-height:34px}
+.stars{color:#f5a623;font-size:14px;margin:4px 0 8px}
+.btn{background:#22a845;color:#fff;border:0;border-radius:8px;padding:10px;font:inherit;font-weight:600;cursor:pointer;width:calc(100% - 24px)}
+.btn:active{background:#1b8a39}
+.link{background:none;border:0;color:#3f5470;font:inherit;cursor:pointer;padding:0;margin-bottom:12px}
+.panel{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+.head{display:flex;align-items:center;gap:12px}
+.head .avatar{margin:0;width:56px;height:56px;font-size:22px;flex:0 0 56px}
+.head h2{margin:0;font-size:18px}
+.head .stars{margin:2px 0}
+.muted{color:#667;font-size:14px}
+.msg{padding:12px;border-radius:10px;background:#fde2e2;color:#a11}
+.monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.monthbar b{font-size:17px}
+.arrow{width:42px;height:42px;border-radius:10px;border:1px solid #d5d9e0;background:#fff;font-size:20px;cursor:pointer}
+.arrow:disabled{opacity:.35;cursor:default}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;position:relative}
+.day{flex:0 0 58px;background:#fff;border:1px solid #d5d9e0;border-radius:12px;padding:8px 0;text-align:center;font:inherit;color:inherit;cursor:pointer}
+.day small{display:block;font-size:11px;color:#667}
+.day b{display:block;font-size:20px}
+.day.sel{background:#3f5470;color:#fff;border-color:#3f5470}
+.day.sel small{color:#cfd8e6}
+.day:disabled{opacity:.4;cursor:default}
+.bars{display:flex;gap:2px;justify-content:center;margin-top:6px}
+.bars i{width:7px;height:7px;border-radius:2px;background:#ccd}
+.bars i.g{background:#22a845}
+.bars i.r{background:#a32020}
 </style>
 </head>
 <body>
-<header>✂ Bərbər rezerv</header>
+<header>✂ BarberConnect</header>
 <main id="app"></main>
 <script>
 const app = document.getElementById('app');
 const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
-const iso = d => { const x = new Date(d); return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
-let shop = null, msg = null, date = iso(Date.now() + 864e5);
+const COLORS = ['#c0562f', '#2f7bc0', '#7b4fc0', '#2fa086', '#b8860b', '#c02f6b'];
+const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
+const WD = ['Baz', 'B.e', 'Ç.a', 'Çər', 'C.a', 'Cüm', 'Şən'];
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+let shops = [];
+let query = '';
 
-function show(...n) { app.replaceChildren(...n); }
-function banner() {
-  if (!msg) return [];
-  const b = $('div', { className: 'msg ' + msg.t, textContent: msg.x });
-  msg = null;
-  return [b];
+function avatar(s) {
+  const a = $('div', { className: 'avatar', textContent: s.masterName.slice(0, 1).toUpperCase() });
+  a.style.background = COLORS[s.id % COLORS.length];
+  return a;
 }
-async function api(u, o) {
-  const r = await fetch(u, o);
-  let d = null;
-  try { d = await r.json(); } catch (e) {}
-  return { s: r.status, d };
-}
-
-async function home() {
-  const { s, d } = await api('/api/shops');
-  const items = (s === 200 ? d : []).map(x => {
-    const c = $('div', { className: 'card shop' }, $('b', { textContent: x.name }), $('span', { textContent: x.address }));
-    c.onclick = () => { shop = x; slots(); };
-    return c;
-  });
-  show(...banner(), $('h2', { textContent: 'Bərbər seçin' }), ...items);
+function stars(r) {
+  const full = Math.round(r);
+  return '★'.repeat(full) + '☆'.repeat(5 - full) + ' ' + r.toFixed(1);
 }
 
-async function slots() {
-  const back = $('button', { className: 'link', textContent: '← Geri' });
-  back.onclick = home;
-  const di = $('input', { type: 'date', value: date, min: iso(Date.now()) });
-  di.onchange = () => { if (di.value) { date = di.value; slots(); } };
-  const { s, d } = await api(`/api/shops/${shop.id}/slots?date=${date}`);
-  const list = $('div', { className: 'slots' });
-  (s === 200 ? d : []).forEach(x => {
-    const b = $('button', { textContent: x.startTime.slice(11, 16) });
-    b.onclick = () => form(x);
-    list.append(b);
-  });
-  const empty = (s === 200 && d.length === 0) ? $('p', { textContent: 'Bu gün boş saat yoxdur' }) : '';
-  show(...banner(), back, $('h2', { textContent: shop.name }), di, empty, list);
+function homeView() {
+  const search = $('input', { type: 'search', placeholder: 'Bərbər, usta və ya ünvan axtarın...', value: query });
+  const grid = $('div', { className: 'grid' });
+  search.oninput = () => { query = search.value; fill(); };
+  function fill() {
+    const q = query.trim().toLowerCase();
+    const list = shops.filter(s =>
+      (s.name + ' ' + s.masterName + ' ' + s.address).toLowerCase().includes(q));
+    grid.replaceChildren(...(list.length ? list.map(card)
+      : [$('p', { className: 'muted', textContent: 'Heç nə tapılmadı' })]));
+  }
+  fill();
+  app.replaceChildren(
+    $('div', { className: 'hero' }, $('h1', { textContent: 'Bərbər seçin' }), search),
+    grid);
 }
 
-function form(x) {
-  const back = $('button', { className: 'link', textContent: '← Geri' });
-  back.onclick = slots;
-  const n = $('input', { placeholder: 'Adınız', maxLength: 60 });
-  const p = $('input', { placeholder: 'Telefon: +994501234567', type: 'tel', maxLength: 16 });
-  const err = $('div');
-  const b = $('button', { textContent: 'Rezerv et' });
-  b.onclick = async () => {
-    b.disabled = true;
-    err.className = ''; err.textContent = '';
-    const { s } = await api(`/api/slots/${x.id}/book`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: n.value.trim(), phone: p.value.trim() })
-    });
-    if (s === 200) {
-      msg = { t: 'ok', x: `Rezerv olundu: ${shop.name}, ${date} ${x.startTime.slice(11, 16)}` };
-      home();
-    } else if (s === 409) {
-      msg = { t: 'err', x: 'Bu saat artıq tutulub, başqa saat seçin' };
-      slots();
-    } else {
-      b.disabled = false;
-      err.className = 'msg err';
-      err.textContent = s === 400 ? 'Ad və düzgün telefon yazın (məs. +994501234567)' : 'Xəta baş verdi, yenidən cəhd edin';
+function card(s) {
+  const btn = $('button', { className: 'btn', textContent: 'BOOK NOW' });
+  const c = $('div', { className: 'card' },
+    $('div', { className: 'top' }), avatar(s),
+    $('b', { textContent: s.masterName + ' @' }),
+    $('div', { className: 'shop', textContent: s.name }),
+    $('div', { className: 'stars', textContent: stars(s.rating) }),
+    btn);
+  c.onclick = () => shopView(s);
+  return c;
+}
+
+async function shopView(s) {
+  const back = $('button', { className: 'link', textContent: '← Bütün bərbərlər' });
+  back.onclick = homeView;
+  const head = $('div', { className: 'panel head' }, avatar(s),
+    $('div', {},
+      $('h2', { textContent: s.masterName + ' @ ' + s.name }),
+      $('div', { className: 'stars', textContent: stars(s.rating) }),
+      $('div', { className: 'muted', textContent: '📍 ' + s.address })));
+  app.replaceChildren(back, head, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+
+  let avail = {};
+  try {
+    const r = await fetch(`/api/shops/${s.id}/availability?days=60`);
+    if (!r.ok) throw new Error(r.status);
+    (await r.json()).forEach(d => { avail[d.date] = d; });
+  } catch (e) {
+    app.replaceChildren(back, head, $('div', { className: 'msg', textContent: 'Tarixləri yükləmək alınmadı. Yenidən cəhd edin.' }));
+    return;
+  }
+
+  const todayKey = iso(new Date());
+  const keys = Object.keys(avail).sort();
+  const minMonth = new Date(); minMonth.setDate(1);
+  const last = new Date(keys[keys.length - 1] + 'T00:00:00');
+  const maxMonth = new Date(last.getFullYear(), last.getMonth(), 1);
+  let month = new Date(minMonth.getFullYear(), minMonth.getMonth(), 1);
+  let selected = todayKey;
+  let buttons = {};
+
+  const label = $('b');
+  const prev = $('button', { className: 'arrow', textContent: '‹', ariaLabel: 'Əvvəlki ay' });
+  const next = $('button', { className: 'arrow', textContent: '›', ariaLabel: 'Növbəti ay' });
+  const strip = $('div', { className: 'strip' });
+  const detail = $('div', { className: 'panel' });
+  const monthbar = $('div', { className: 'monthbar' }, prev, label, next);
+
+  function bars(key, past) {
+    const st = avail[key];
+    const wrap = $('div', { className: 'bars' });
+    let g = 0, r = 0;
+    if (!past && st && st.total > 0) {
+      g = st.free > 0 ? Math.max(1, Math.round(st.free / st.total * 5)) : 0;
+      r = 5 - g;
     }
+    for (let i = 0; i < 5; i++) wrap.append($('i', { className: i < g ? 'g' : i < g + r ? 'r' : '' }));
+    return wrap;
+  }
+
+  function buildStrip() {
+    buttons = {};
+    const y = month.getFullYear(), m = month.getMonth();
+    label.textContent = MONTHS[m] + ' ' + y;
+    prev.disabled = month <= minMonth;
+    next.disabled = month >= maxMonth;
+    const n = new Date(y, m + 1, 0).getDate();
+    const items = [];
+    for (let d = 1; d <= n; d++) {
+      const date = new Date(y, m, d);
+      const key = iso(date);
+      const past = key < todayKey;
+      const b = $('button', { className: 'day', disabled: past },
+        $('small', { textContent: WD[date.getDay()] }),
+        $('b', { textContent: String(d) }),
+        bars(key, past));
+      b.onclick = () => select(key);
+      buttons[key] = b;
+      items.push(b);
+    }
+    strip.replaceChildren(...items);
+    markSelected();
+  }
+
+  function markSelected() {
+    Object.entries(buttons).forEach(([k, b]) => b.classList.toggle('sel', k === selected));
+    const b = buttons[selected];
+    if (b) strip.scrollLeft = b.offsetLeft - strip.clientWidth / 2 + b.offsetWidth / 2;
+    renderDetail();
+  }
+
+  function select(key) { selected = key; markSelected(); }
+
+  function renderDetail() {
+    const st = avail[selected];
+    const d = new Date(selected + 'T00:00:00');
+    const text = `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}`;
+    detail.replaceChildren(
+      $('b', { textContent: text }),
+      $('p', { className: 'muted', textContent: st ? `Boş saat: ${st.free} / ${st.total}` : 'Bu gün üçün məlumat yoxdur' }),
+      $('p', { className: 'muted', textContent: 'Səhər, günorta, axşam blokları növbəti etapda əlavə olunacaq.' }));
+  }
+
+  prev.onclick = () => {
+    month = new Date(month.getFullYear(), month.getMonth() - 1, 1);
+    selected = iso(month) >= todayKey ? iso(month) : todayKey;
+    buildStrip();
   };
-  show(back, $('h2', { textContent: `${shop.name}, ${x.startTime.slice(11, 16)}` }), n, p, err, b);
+  next.onclick = () => {
+    month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+    selected = iso(month);
+    buildStrip();
+  };
+
+  app.replaceChildren(back, head, monthbar, strip, detail);
+  buildStrip();
 }
 
-home();
+async function init() {
+  try {
+    const r = await fetch('/api/shops');
+    if (!r.ok) throw new Error(r.status);
+    shops = await r.json();
+    homeView();
+  } catch (e) {
+    app.replaceChildren($('div', { className: 'msg', textContent: 'Bərbərləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
+  }
+}
+init();
 </script>
 </body>
 </html>
