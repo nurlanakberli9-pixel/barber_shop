@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>BarberConnect · Bərbər paneli</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#eef0f4;color:#1c2536}
+header{background:#fff;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px}
+header .brand{font-size:19px;font-weight:700}
+header .tag{background:#3f5470;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px}
+header button{margin-left:auto}
+main{max-width:640px;margin:0 auto;padding:16px}
+.panel{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.panel h2{margin:0 0 10px;font-size:17px}
+.muted{color:#667;font-size:14px}
+input,select{width:100%;font:inherit;padding:12px;border:1px solid #ccd;border-radius:10px;background:#fff}
+label{display:block;font-size:13px;color:#667;margin:10px 0 4px}
+button{font:inherit;border-radius:10px;border:0;padding:12px 16px;cursor:pointer;background:#3f5470;color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button.green{background:#22a845}
+button.small{padding:8px 12px;font-size:14px}
+button.danger{background:#a32020}
+button.ghost{background:#e3e7ee;color:#1c2536}
+.full{width:100%;margin-top:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg{padding:12px;border-radius:10px;margin-top:12px;background:#fde2e2;color:#a11}
+.msg.ok{background:#d9f5e0;color:#146c2e}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eceef2}
+.row:last-child{border-bottom:0}
+.time{font-weight:700;width:52px;flex:0 0 52px}
+.info{flex:1;min-width:0;font-size:14px}
+.info b,.info a,.info span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.info a{color:#2f6fb0}
+.chip{font-size:12px;border-radius:8px;padding:4px 8px;color:#fff;white-space:nowrap}
+.chip.free{background:#22a845}
+.chip.booked{background:#a32020}
+.chip.past{background:#aab0bb}
+.summary{display:flex;gap:14px;font-size:14px;margin-bottom:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
+.toast.ok{background:#1b8a39}
+.toast.err{background:#a32020}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">✂ BarberConnect</span>
+  <span class="tag">Bərbər paneli</span>
+  <button id="logout" class="ghost small" hidden>Çıxış</button>
+</header>
+<main id="app"></main>
+<script>
+const app = document.getElementById('app');
+const logoutBtn = document.getElementById('logout');
+const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
+const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
+const LABEL = { FREE: 'Boş', BOOKED: 'Dolu', PAST: 'Keçmiş' };
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayKey = iso(new Date());
+const maxKey = iso(new Date(Date.now() + 59 * 864e5));
+let me = null;
+let date = todayKey;
+let dayToken = 0;
+
+function toast(text, type) {
+  const t = $('div', { className: 'toast ' + type, textContent: text });
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function csrf() {
+  try { await fetch('/api/csrf'); } catch (e) { return ''; }
+  const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+async function call(method, url, body) {
+  const headers = {};
+  const init = { method, headers };
+  if (method !== 'GET') headers['X-XSRF-TOKEN'] = await csrf();
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  try {
+    const r = await fetch(url, init);
+    const text = await r.text();
+    let data = null;
+    if (text) { try { data = JSON.parse(text); } catch (e) {} }
+    return { status: r.status, data };
+  } catch (e) {
+    return { status: 0, data: null };
+  }
+}
+
+function showLogin(message, ok) {
+  me = null;
+  logoutBtn.hidden = true;
+  const user = $('input', { type: 'text', autocomplete: 'username', autocapitalize: 'none', spellcheck: false, maxLength: 64 });
+  const pass = $('input', { type: 'password', autocomplete: 'current-password', maxLength: 128 });
+  const note = $('div');
+  if (message) { note.className = 'msg' + (ok ? ' ok' : ''); note.textContent = message; }
+  const btn = $('button', { className: 'green full', type: 'submit', textContent: 'Daxil ol' });
+  const form = $('form', {},
+    $('label', { textContent: 'İstifadəçi adı' }), user,
+    $('label', { textContent: 'Parol' }), pass, btn, note);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    btn.disabled = true;
+    note.className = ''; note.textContent = '';
+    let status = 0;
+    try {
+      const token = await csrf();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'X-XSRF-TOKEN': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: user.value.trim(), password: pass.value })
+      });
+      status = r.status;
+    } catch (err) { status = 0; }
+    pass.value = '';
+    if (status === 200) { boot(); return; }
+    btn.disabled = false;
+    note.className = 'msg';
+    note.textContent =
+      status === 401 ? 'İstifadəçi adı və ya parol səhvdir' :
+      status === 429 ? 'Çox sayda səhv cəhd oldu. 15 dəqiqə sonra yenidən cəhd edin' :
+      status === 403 ? 'Sessiya yenilənməlidir, səhifəni yeniləyin' :
+      'Xəta baş verdi, bağlantını yoxlayıb yenidən cəhd edin';
+  };
+  app.replaceChildren($('div', { className: 'panel' }, $('h2', { textContent: 'Bərbər girişi' }), form));
+}
+
+function sessionExpired() {
+  showLogin('Sessiya bitdi, yenidən daxil olun');
+}
+
+function showPanel() {
+  logoutBtn.hidden = false;
+  const dateInput = $('input', { type: 'date', value: date, min: todayKey, max: maxKey });
+  const from = $('select');
+  const to = $('select');
+  for (let h = 9; h <= 20; h++) from.append($('option', { value: String(h), textContent: pad(h) + ':00' }));
+  for (let h = 10; h <= 21; h++) to.append($('option', { value: String(h), textContent: pad(h) + ':00' }));
+  from.value = '10';
+  to.value = '18';
+  const createNote = $('div');
+  const createBtn = $('button', { className: 'green full', textContent: 'Saatları yarat' });
+  const list = $('div');
+
+  dateInput.onchange = () => {
+    const v = dateInput.value;
+    if (!v || v < todayKey || v > maxKey) {
+      toast('Tarix bugündən 60 günlük aralıqda olmalıdır', 'err');
+      dateInput.value = date;
+      return;
+    }
+    date = v;
+    loadDay();
+  };
+
+  createBtn.onclick = async () => {
+    createNote.className = ''; createNote.textContent = '';
+    const f = +from.value, t = +to.value;
+    if (t <= f) {
+      createNote.className = 'msg';
+      createNote.textContent = 'Bitmə saatı başlama saatından sonra olmalıdır';
+      return;
+    }
+    createBtn.disabled = true;
+    const r = await call('POST', '/api/panel/slots', { date, fromHour: f, toHour: t });
+    createBtn.disabled = false;
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 200 && r.data) {
+      createNote.className = 'msg ok';
+      createNote.textContent = `${r.data.created} saat yaradıldı, ${r.data.skipped} saat atlandı (artıq var və ya vaxtı keçib)`;
+      loadDay();
+    } else {
+      createNote.className = 'msg';
+      createNote.textContent =
+        r.status === 400 ? 'Tarix və ya saat aralığı düzgün deyil' :
+        r.status === 409 ? 'Eyni anda başqa dəyişiklik oldu, yenidən cəhd edin' :
+        'Xəta baş verdi, yenidən cəhd edin';
+    }
+  };
+
+  async function deleteSlot(x, time, btn) {
+    if (!confirm(`${time} saatını silmək istəyirsiniz?`)) return;
+    btn.disabled = true;
+    const r = await call('DELETE', `/api/panel/slots/${x.id}`);
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 204) toast('Saat silindi', 'ok');
+    else if (r.status === 409) toast('Dolu saatı silmək olmaz, əvvəl rezervi ləğv edin', 'err');
+    else if (r.status === 404) toast('Saat tapılmadı', 'err');
+    else toast('Xəta baş verdi', 'err');
+    loadDay();
+  }
+
+  async function cancelSlot(x, time, btn) {
+    if (!confirm(`${time} saatındakı rezervi ləğv etmək istəyirsiniz? Müştəriyə xəbər getməyəcək.`)) return;
+    btn.disabled = true;
+    const r = await call('POST', `/api/panel/slots/${x.id}/cancel`);
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 204) toast('Rezerv ləğv edildi, saat yenidən boşdur', 'ok');
+    else if (r.status === 409) toast('Bu saat artıq rezerv olunmayıb', 'err');
+    else if (r.status === 404) toast('Saat tapılmadı', 'err');
+    else toast('Xəta baş verdi', 'err');
+    loadDay();
+  }
+
+  function row(x) {
+    const time = x.startTime.slice(11, 16);
+    const info = $('div', { className: 'info' });
+    const r = $('div', { className: 'row' }, $('div', { className: 'time', textContent: time }), info);
+    r.append($('span', { className: 'chip ' + x.status.toLowerCase(), textContent: LABEL[x.status] || x.status }));
+    if (x.status === 'BOOKED') {
+      info.append($('b', { textContent: x.customerName || '—' }));
+      if (x.customerPhone) {
+        info.append(/^\+?[0-9]{9,15}$/.test(x.customerPhone)
+          ? $('a', { href: 'tel:' + x.customerPhone, textContent: x.customerPhone })
+          : $('span', { textContent: x.customerPhone }));
+      }
+      const b = $('button', { className: 'small danger', textContent: 'Ləğv et' });
+      b.onclick = () => cancelSlot(x, time, b);
+      r.append(b);
+    } else if (x.status === 'FREE') {
+      const b = $('button', { className: 'small ghost', textContent: 'Sil' });
+      b.onclick = () => deleteSlot(x, time, b);
+      r.append(b);
+    }
+    return r;
+  }
+
+  async function loadDay() {
+    const token = ++dayToken;
+    list.replaceChildren($('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', `/api/panel/day?date=${date}`);
+    if (token !== dayToken) return;
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      list.replaceChildren($('div', { className: 'msg', textContent: 'Saatları yükləmək alınmadı. Yenidən cəhd edin.' }));
+      return;
+    }
+    const d = new Date(date + 'T00:00:00');
+    const free = r.data.filter(x => x.status === 'FREE').length;
+    const booked = r.data.filter(x => x.status === 'BOOKED').length;
+    list.replaceChildren(
+      $('h2', { textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}` }),
+      $('div', { className: 'summary' },
+        $('span', { textContent: `Boş: ${free}` }), $('span', { textContent: `Dolu: ${booked}` }),
+        $('span', { textContent: `Cəmi: ${r.data.length}` })),
+      ...(r.data.length ? r.data.map(row)
+        : [$('p', { className: 'muted', textContent: 'Bu gün üçün saat yoxdur. Yuxarıdan yarada bilərsiniz.' })]));
+  }
+
+  app.replaceChildren(
+    $('div', { className: 'panel' },
+      $('h2', { textContent: `${me.masterName} @ ${me.shopName}` }),
+      $('label', { textContent: 'Gün' }), dateInput),
+    $('div', { className: 'panel' },
+      $('h2', { textContent: 'Saat yarat' }),
+      $('div', { className: 'two' },
+        $('div', {}, $('label', { textContent: 'Başlama' }), from),
+        $('div', {}, $('label', { textContent: 'Bitmə' }), to)),
+      $('p', { className: 'muted', textContent: 'Hər tam saat üçün bir xana yaradılır. Artıq olan saatlar atlanır.' }),
+      createBtn, createNote),
+    $('div', { className: 'panel' }, list));
+  loadDay();
+}
+
+logoutBtn.onclick = async () => {
+  logoutBtn.disabled = true;
+  await call('POST', '/api/logout');
+  logoutBtn.disabled = false;
+  showLogin('Çıxış edildi', true);
+};
+
+async function boot() {
+  const r = await call('GET', '/api/panel/me');
+  if (r.status === 200 && r.data) { me = r.data; showPanel(); }
+  else if (r.status === 401) showLogin();
+  else app.replaceChildren($('div', { className: 'msg', textContent: 'Serverə qoşulmaq alınmadı. Səhifəni yeniləyin.' }));
+}
+boot();
+</script>
+</body>
+</html>

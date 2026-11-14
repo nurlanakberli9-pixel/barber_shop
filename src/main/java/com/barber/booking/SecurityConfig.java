@@ -24,7 +24,7 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/error").permitAll()
-                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico",
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/panel.html", "/favicon.ico",
                         "/api/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/slots/*/book", "/api/login",
