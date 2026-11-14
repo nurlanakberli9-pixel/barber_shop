@@ -40,4 +40,10 @@ public class Slot {
         this.customerName = name;
         this.customerPhone = phone;
     }
+
+    public void cancelBooking() {
+        this.booked = false;
+        this.customerName = null;
+        this.customerPhone = null;
+    }
 }

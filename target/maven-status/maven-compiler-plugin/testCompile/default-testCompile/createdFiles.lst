@@ -1,4 +1,5 @@
 com/barber/booking/BookingApplicationTests.class
+com/barber/booking/PanelTests.class
 com/barber/booking/AccountSeedTests.class
 com/barber/booking/BookingApiTests.class
 com/barber/booking/LoginTests.class

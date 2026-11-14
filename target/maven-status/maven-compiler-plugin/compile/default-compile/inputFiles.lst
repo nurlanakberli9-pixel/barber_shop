@@ -10,6 +10,7 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/DataSeeder.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginAttemptService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/PanelController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Slot.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SlotRepository.java
