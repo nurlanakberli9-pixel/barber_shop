@@ -1,8 +1,0 @@
-INSERT INTO barbershop (name, address) VALUES ('Royal Barber', 'Nizami küç. 10');
-INSERT INTO barbershop (name, address) VALUES ('Gentleman Cut', 'Fizuli küç. 25');
-INSERT INTO slot (barbershop_id, start_time, booked, version) VALUES
- (1, DATEADD('HOUR', 10, DATEADD('DAY', 1, CAST(CURRENT_DATE AS TIMESTAMP))), FALSE, 0),
- (1, DATEADD('HOUR', 11, DATEADD('DAY', 1, CAST(CURRENT_DATE AS TIMESTAMP))), FALSE, 0),
- (1, DATEADD('HOUR', 12, DATEADD('DAY', 1, CAST(CURRENT_DATE AS TIMESTAMP))), FALSE, 0),
- (2, DATEADD('HOUR', 10, DATEADD('DAY', 1, CAST(CURRENT_DATE AS TIMESTAMP))), FALSE, 0),
- (2, DATEADD('HOUR', 14, DATEADD('DAY', 1, CAST(CURRENT_DATE AS TIMESTAMP))), FALSE, 0);
