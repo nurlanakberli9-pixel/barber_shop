@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bərbər rezerv</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#f4f4f6;color:#1c1c1e}
+header{background:#1c1c1e;color:#fff;padding:16px;font-size:20px;font-weight:600}
+main{max-width:480px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.shop{cursor:pointer}
+.shop b{display:block;font-size:17px}
+.shop span{color:#666;font-size:14px}
+button,input{font:inherit;border-radius:10px;border:1px solid #ccc;padding:12px;width:100%;margin-top:8px}
+button{background:#1c1c1e;color:#fff;border:0;cursor:pointer}
+button:disabled{opacity:.5}
+button.link{background:none;color:#06c;width:auto;padding:0;margin:0 0 12px}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.slots button{margin:0;padding:12px 0}
+.msg{padding:12px;border-radius:10px;margin-bottom:12px}
+.ok{background:#d9f5e0;color:#146c2e}
+.err{background:#fde2e2;color:#a11}
+</style>
+</head>
+<body>
+<header>✂ Bərbər rezerv</header>
+<main id="app"></main>
+<script>
+const app = document.getElementById('app');
+const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
+const iso = d => { const x = new Date(d); return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+let shop = null, msg = null, date = iso(Date.now() + 864e5);
+
+function show(...n) { app.replaceChildren(...n); }
+function banner() {
+  if (!msg) return [];
+  const b = $('div', { className: 'msg ' + msg.t, textContent: msg.x });
+  msg = null;
+  return [b];
+}
+async function api(u, o) {
+  const r = await fetch(u, o);
+  let d = null;
+  try { d = await r.json(); } catch (e) {}
+  return { s: r.status, d };
+}
+
+async function home() {
+  const { s, d } = await api('/api/shops');
+  const items = (s === 200 ? d : []).map(x => {
+    const c = $('div', { className: 'card shop' }, $('b', { textContent: x.name }), $('span', { textContent: x.address }));
+    c.onclick = () => { shop = x; slots(); };
+    return c;
+  });
+  show(...banner(), $('h2', { textContent: 'Bərbər seçin' }), ...items);
+}
+
+async function slots() {
+  const back = $('button', { className: 'link', textContent: '← Geri' });
+  back.onclick = home;
+  const di = $('input', { type: 'date', value: date, min: iso(Date.now()) });
+  di.onchange = () => { if (di.value) { date = di.value; slots(); } };
+  const { s, d } = await api(`/api/shops/${shop.id}/slots?date=${date}`);
+  const list = $('div', { className: 'slots' });
+  (s === 200 ? d : []).forEach(x => {
+    const b = $('button', { textContent: x.startTime.slice(11, 16) });
+    b.onclick = () => form(x);
+    list.append(b);
+  });
+  const empty = (s === 200 && d.length === 0) ? $('p', { textContent: 'Bu gün boş saat yoxdur' }) : '';
+  show(...banner(), back, $('h2', { textContent: shop.name }), di, empty, list);
+}
+
+function form(x) {
+  const back = $('button', { className: 'link', textContent: '← Geri' });
+  back.onclick = slots;
+  const n = $('input', { placeholder: 'Adınız', maxLength: 60 });
+  const p = $('input', { placeholder: 'Telefon: +994501234567', type: 'tel', maxLength: 16 });
+  const err = $('div');
+  const b = $('button', { textContent: 'Rezerv et' });
+  b.onclick = async () => {
+    b.disabled = true;
+    err.className = ''; err.textContent = '';
+    const { s } = await api(`/api/slots/${x.id}/book`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: n.value.trim(), phone: p.value.trim() })
+    });
+    if (s === 200) {
+      msg = { t: 'ok', x: `Rezerv olundu: ${shop.name}, ${date} ${x.startTime.slice(11, 16)}` };
+      home();
+    } else if (s === 409) {
+      msg = { t: 'err', x: 'Bu saat artıq tutulub, başqa saat seçin' };
+      slots();
+    } else {
+      b.disabled = false;
+      err.className = 'msg err';
+      err.textContent = s === 400 ? 'Ad və düzgün telefon yazın (məs. +994501234567)' : 'Xəta baş verdi, yenidən cəhd edin';
+    }
+  };
+  show(back, $('h2', { textContent: `${shop.name}, ${x.startTime.slice(11, 16)}` }), n, p, err, b);
+}
+
+home();
+</script>
+</body>
+</html>

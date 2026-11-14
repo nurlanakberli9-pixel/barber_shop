@@ -21,6 +21,13 @@ public class Slot {
     @Version
     private Long version;
 
+    protected Slot() {}
+
+    public Slot(Barbershop barbershop, LocalDateTime startTime) {
+        this.barbershop = barbershop;
+        this.startTime = startTime;
+    }
+
     public Long getId() { return id; }
     public Barbershop getBarbershop() { return barbershop; }
     public LocalDateTime getStartTime() { return startTime; }

@@ -2,6 +2,7 @@ package com.barber.booking;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,26 +13,39 @@ class BookingControllerTests {
 
     @Autowired
     BookingController controller;
+    @Autowired
+    SlotRepository slots;
+
+    private static final BookingController.BookRequest REQ =
+            new BookingController.BookRequest("Elvin", "+994501234567");
+
+    private Slot freeSlot(int skip) {
+        return slots.findAll().stream()
+                .filter(s -> !s.isBooked()
+                        && s.getStartTime().isAfter(LocalDateTime.now().plusHours(1)))
+                .skip(skip).findFirst().orElseThrow();
+    }
 
     @Test
     void bookFreeSlot() {
-        var result = controller.book(3L,
-                new BookingController.BookRequest("Elvin", "+994501234567"));
-        assertEquals(3L, result.id());
+        Slot s = freeSlot(0);
+        var result = controller.book(s.getId(), REQ);
+        assertEquals(s.getId(), result.id());
     }
 
     @Test
     void secondBookingOfSameSlotIsRejected() {
-        var req = new BookingController.BookRequest("Elvin", "+994501234567");
-        controller.book(4L, req);
-        var ex = assertThrows(ResponseStatusException.class, () -> controller.book(4L, req));
+        Slot s = freeSlot(10);
+        controller.book(s.getId(), REQ);
+        var ex = assertThrows(ResponseStatusException.class,
+                () -> controller.book(s.getId(), REQ));
         assertEquals(409, ex.getStatusCode().value());
     }
 
     @Test
     void unknownSlotReturns404() {
-        var ex = assertThrows(ResponseStatusException.class, () -> controller.book(999L,
-                new BookingController.BookRequest("Elvin", "+994501234567")));
+        var ex = assertThrows(ResponseStatusException.class,
+                () -> controller.book(Long.MAX_VALUE, REQ));
         assertEquals(404, ex.getStatusCode().value());
     }
 }
