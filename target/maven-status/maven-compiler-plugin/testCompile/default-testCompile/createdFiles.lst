@@ -1,3 +1,4 @@
-com/barber/booking/BookingApiTests.class
 com/barber/booking/BookingApplicationTests.class
+com/barber/booking/AccountSeedTests.class
+com/barber/booking/BookingApiTests.class
 com/barber/booking/BookingControllerTests.class
