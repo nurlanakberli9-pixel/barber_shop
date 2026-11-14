@@ -1,10 +1,12 @@
 com/barber/booking/Barbershop.class
 com/barber/booking/BookingController$BookRequest.class
 com/barber/booking/BookingController$ShopDto.class
+com/barber/booking/BookingController$DaySlotDto.class
 com/barber/booking/ApiExceptionHandler.class
 com/barber/booking/DataSeeder.class
 com/barber/booking/BookingController.class
 com/barber/booking/SlotRepository.class
+com/barber/booking/BookingController$DayStat.class
 com/barber/booking/BookingApplication.class
 com/barber/booking/BarbershopRepository.class
 com/barber/booking/BookingController$SlotDto.class
