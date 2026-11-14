@@ -38,7 +38,7 @@ class BookingApiTests {
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.webAppContextSetup(ctx).build();
+        mvc = MockMvcBuilders.webAppContextSetup(ctx).apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()).build();
     }
 
     private String getBody(String url, int expectedStatus) throws Exception {
@@ -127,8 +127,8 @@ class BookingApiTests {
     }
 
     @Test
-    void getOnBookEndpointIs405() throws Exception {
-        getBody("/api/slots/1/book", 405);
+    void getOnBookEndpointIsDeniedBySecurity() throws Exception {
+        getBody("/api/slots/1/book", 401);
     }
 
     @Test

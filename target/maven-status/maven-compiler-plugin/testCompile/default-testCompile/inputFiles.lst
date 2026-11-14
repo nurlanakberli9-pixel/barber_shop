@@ -2,3 +2,4 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingApiTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingApplicationTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingControllerTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/LoginTests.java
