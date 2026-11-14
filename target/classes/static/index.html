@@ -21,14 +21,15 @@ main{max-width:960px;margin:0 auto;padding:16px}
 .stars{color:#f5a623;font-size:14px;margin:4px 0 8px}
 .btn{background:#22a845;color:#fff;border:0;border-radius:8px;padding:10px;font:inherit;font-weight:600;cursor:pointer;width:calc(100% - 24px)}
 .btn:active{background:#1b8a39}
+.btn:disabled{opacity:.6}
 .link{background:none;border:0;color:#3f5470;font:inherit;cursor:pointer;padding:0;margin-bottom:12px}
 .panel{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
 .head{display:flex;align-items:center;gap:12px}
-.head .avatar{margin:0;width:56px;height:56px;font-size:22px;flex:0 0 56px}
+.head .avatar{margin:0;width:56px;height:56px;flex:0 0 56px;font-size:22px}
 .head h2{margin:0;font-size:18px}
 .head .stars{margin:2px 0}
 .muted{color:#667;font-size:14px}
-.msg{padding:12px;border-radius:10px;background:#fde2e2;color:#a11}
+.msg{padding:12px;border-radius:10px;background:#fde2e2;color:#a11;margin-top:10px}
 .monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .monthbar b{font-size:17px}
 .arrow{width:42px;height:42px;border-radius:10px;border:1px solid #d5d9e0;background:#fff;font-size:20px;cursor:pointer}
@@ -44,6 +45,28 @@ main{max-width:960px;margin:0 auto;padding:16px}
 .bars i{width:7px;height:7px;border-radius:2px;background:#ccd}
 .bars i.g{background:#22a845}
 .bars i.r{background:#a32020}
+.legend{display:flex;gap:14px;font-size:13px;color:#667;margin:8px 0 4px;flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;background:var(--c)}
+.block{margin-top:14px}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.slot{border:0;border-radius:10px;padding:13px 0;font:inherit;font-weight:600;color:#fff}
+.slot.free{background:#22a845;cursor:pointer}
+.slot.free:active{background:#1b8a39}
+.slot.booked{background:#a32020}
+.slot.past{background:#d5d8de;color:#7b8190}
+.slot:disabled{cursor:default}
+.overlay{position:fixed;inset:0;background:rgba(10,15,25,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:16px;max-height:92vh;overflow-y:auto}
+.sheet .bar{display:flex;justify-content:space-between;align-items:center;background:#3f5470;color:#fff;margin:-16px -16px 12px;padding:14px 16px;border-radius:18px 18px 0 0}
+.sheet .bar b{font-size:17px}
+.x{background:none;border:0;color:#fff;font-size:20px;cursor:pointer}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eceef2}
+.row span{color:#667}
+.sheet input{width:100%;margin-top:10px;padding:12px;border:1px solid #ccd;border-radius:10px;font:inherit}
+.sheet .btn{width:100%;margin-top:14px;padding:14px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
+.toast.ok{background:#1b8a39}
+.toast.err{background:#a32020}
 </style>
 </head>
 <body>
@@ -55,11 +78,17 @@ const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.ass
 const COLORS = ['#c0562f', '#2f7bc0', '#7b4fc0', '#2fa086', '#b8860b', '#c02f6b'];
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
 const WD = ['Baz', 'B.e', 'Ç.a', 'Çər', 'C.a', 'Cüm', 'Şən'];
+const BLOCKS = [['🌅 Səhər', '09:00-12:00', 9, 12], ['☀️ Gündüz', '12:00-17:00', 12, 17], ['🌙 Axşam', '17:00-21:00', 17, 21]];
 const pad = n => String(n).padStart(2, '0');
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 let shops = [];
 let query = '';
 
+function toast(text, type) {
+  const t = $('div', { className: 'toast ' + type, textContent: text });
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4500);
+}
 function avatar(s) {
   const a = $('div', { className: 'avatar', textContent: s.masterName.slice(0, 1).toUpperCase() });
   a.style.background = COLORS[s.id % COLORS.length];
@@ -110,10 +139,14 @@ async function shopView(s) {
   app.replaceChildren(back, head, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
 
   let avail = {};
-  try {
+  async function loadAvail() {
     const r = await fetch(`/api/shops/${s.id}/availability?days=60`);
     if (!r.ok) throw new Error(r.status);
+    avail = {};
     (await r.json()).forEach(d => { avail[d.date] = d; });
+  }
+  try {
+    await loadAvail();
   } catch (e) {
     app.replaceChildren(back, head, $('div', { className: 'msg', textContent: 'Tarixləri yükləmək alınmadı. Yenidən cəhd edin.' }));
     return;
@@ -127,6 +160,7 @@ async function shopView(s) {
   let month = new Date(minMonth.getFullYear(), minMonth.getMonth(), 1);
   let selected = todayKey;
   let buttons = {};
+  let dayToken = 0;
 
   const label = $('b');
   const prev = $('button', { className: 'arrow', textContent: '‹', ariaLabel: 'Əvvəlki ay' });
@@ -138,12 +172,10 @@ async function shopView(s) {
   function bars(key, past) {
     const st = avail[key];
     const wrap = $('div', { className: 'bars' });
-    let g = 0, r = 0;
-    if (!past && st && st.total > 0) {
-      g = st.free > 0 ? Math.max(1, Math.round(st.free / st.total * 5)) : 0;
-      r = 5 - g;
-    }
-    for (let i = 0; i < 5; i++) wrap.append($('i', { className: i < g ? 'g' : i < g + r ? 'r' : '' }));
+    let g = 0;
+    if (!past && st && st.total > 0 && st.free > 0) g = Math.max(1, Math.round(st.free / st.total * 5));
+    const showRed = !past && st && st.total > 0;
+    for (let i = 0; i < 5; i++) wrap.append($('i', { className: i < g ? 'g' : showRed ? 'r' : '' }));
     return wrap;
   }
 
@@ -180,14 +212,99 @@ async function shopView(s) {
 
   function select(key) { selected = key; markSelected(); }
 
-  function renderDetail() {
-    const st = avail[selected];
+  async function renderDetail() {
+    const token = ++dayToken;
     const d = new Date(selected + 'T00:00:00');
-    const text = `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}`;
-    detail.replaceChildren(
-      $('b', { textContent: text }),
-      $('p', { className: 'muted', textContent: st ? `Boş saat: ${st.free} / ${st.total}` : 'Bu gün üçün məlumat yoxdur' }),
-      $('p', { className: 'muted', textContent: 'Səhər, günorta, axşam blokları növbəti etapda əlavə olunacaq.' }));
+    detail.replaceChildren($('p', { className: 'muted', textContent: 'Saatlar yüklənir...' }));
+    let slots;
+    try {
+      const r = await fetch(`/api/shops/${s.id}/day?date=${selected}`);
+      if (!r.ok) throw new Error(r.status);
+      slots = await r.json();
+    } catch (e) {
+      if (token !== dayToken) return;
+      detail.replaceChildren($('div', { className: 'msg', textContent: 'Saatları yükləmək alınmadı. Başqa gün seçib yenidən cəhd edin.' }));
+      return;
+    }
+    if (token !== dayToken) return;
+    const legend = $('div', { className: 'legend' },
+      $('span', { textContent: 'Boş' }), $('span', { textContent: 'Dolu' }), $('span', { textContent: 'Keçmiş' }));
+    const sp = legend.children;
+    sp[0].style.setProperty('--c', '#22a845');
+    sp[1].style.setProperty('--c', '#a32020');
+    sp[2].style.setProperty('--c', '#d5d8de');
+    const els = [$('b', { textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}` }), legend];
+    BLOCKS.forEach(([name, range, from, to]) => {
+      const items = slots.filter(x => { const h = +x.startTime.slice(11, 13); return h >= from && h < to; });
+      const grid = $('div', { className: 'slots' });
+      items.forEach(x => {
+        const b = $('button', {
+          className: 'slot ' + x.status.toLowerCase(),
+          textContent: x.startTime.slice(11, 16),
+          disabled: x.status !== 'FREE'
+        });
+        if (x.status === 'FREE') b.onclick = () => openSheet(x);
+        grid.append(b);
+      });
+      els.push($('div', { className: 'block' },
+        $('b', { textContent: name + ' ' + range }),
+        items.length ? grid : $('p', { className: 'muted', textContent: 'Bu bölmədə saat yoxdur' })));
+    });
+    detail.replaceChildren(...els);
+  }
+
+  async function refreshAll() {
+    try { await loadAvail(); } catch (e) {}
+    buildStrip();
+  }
+
+  function openSheet(slot) {
+    const time = slot.startTime.slice(11, 16);
+    const d = new Date(selected + 'T00:00:00');
+    const dateText = `${WD[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+    const row = (k, v) => $('div', { className: 'row' }, $('span', { textContent: k }), $('b', { textContent: v }));
+    const name = $('input', { placeholder: 'Adınız', maxLength: 60, autocomplete: 'name' });
+    const phone = $('input', { placeholder: '+994501234567', type: 'tel', maxLength: 16, autocomplete: 'tel' });
+    const err = $('div');
+    const ok = $('button', { className: 'btn', textContent: 'TƏSDİQ ET' });
+    const close = $('button', { className: 'x', textContent: '✕', ariaLabel: 'Bağla' });
+    const overlay = $('div', { className: 'overlay' });
+    const sheet = $('div', { className: 'sheet' },
+      $('div', { className: 'bar' }, $('b', { textContent: 'One-Tap Rezerv' }), close),
+      row('Bərbər', s.masterName), row('Salon', s.name), row('Tarix', dateText), row('Saat', time),
+      name, phone, err, ok);
+    close.onclick = () => overlay.remove();
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    ok.onclick = async () => {
+      ok.disabled = true;
+      err.className = ''; err.textContent = '';
+      let status = 0;
+      try {
+        const r = await fetch(`/api/slots/${slot.id}/book`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.value.trim(), phone: phone.value.trim() })
+        });
+        status = r.status;
+      } catch (e) { status = 0; }
+      if (status === 200) {
+        overlay.remove();
+        toast(`Rezerv olundu: ${s.masterName}, ${dateText}, ${time}`, 'ok');
+        refreshAll();
+      } else if (status === 409) {
+        overlay.remove();
+        toast('Bu saat artıq tutulub, başqa saat seçin', 'err');
+        refreshAll();
+      } else {
+        ok.disabled = false;
+        err.className = 'msg';
+        err.textContent = status === 400
+          ? 'Ad və düzgün telefon yazın (məs. +994501234567)'
+          : 'Xəta baş verdi, bağlantını yoxlayıb yenidən cəhd edin';
+      }
+    };
+    overlay.append(sheet);
+    document.body.append(overlay);
   }
 
   prev.onclick = () => {
