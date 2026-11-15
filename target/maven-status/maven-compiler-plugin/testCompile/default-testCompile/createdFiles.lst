@@ -1,7 +1,9 @@
 com/barber/booking/BookingApplicationTests.class
 com/barber/booking/PanelTests.class
+com/barber/booking/WindowTests.class
 com/barber/booking/PanelPageTests.class
 com/barber/booking/LoginTests.class
 com/barber/booking/BookingControllerTests.class
 com/barber/booking/AccountSeedTests.class
 com/barber/booking/BookingApiTests.class
+com/barber/booking/ServiceTests.class

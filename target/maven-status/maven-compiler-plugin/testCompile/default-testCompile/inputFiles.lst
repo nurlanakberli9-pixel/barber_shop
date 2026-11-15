@@ -5,3 +5,5 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/LoginTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PanelPageTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PanelTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/ServiceTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/WindowTests.java

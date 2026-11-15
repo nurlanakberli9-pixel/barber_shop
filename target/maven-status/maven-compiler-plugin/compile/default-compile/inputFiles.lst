@@ -12,5 +12,13 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PanelController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ServiceController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ServiceKind.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ServiceType.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ServiceTypeRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Slot.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SlotRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WindowController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WindowCube.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WorkWindow.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WorkWindowRepository.java

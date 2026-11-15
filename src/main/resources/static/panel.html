@@ -138,6 +138,75 @@ function sessionExpired() {
   showLogin('Sessiya bitdi, yenidən daxil olun');
 }
 
+function servicesPanel() {
+  const box = $('div', { className: 'panel' });
+  const title = $('h2', { textContent: 'Xidmətlərim' });
+  const inputs = {};
+  const note = $('div');
+  const sum = $('p', { className: 'muted' });
+  const save = $('button', { className: 'green full', textContent: 'Müddətləri saxla' });
+
+  function updateSum() {
+    const v = Object.values(inputs).map(i => parseInt(i.value, 10));
+    sum.textContent = v.length && v.every(n => n > 0)
+      ? `Minimum iş aralığı: ${v.reduce((a, b) => a + b, 0)} dəqiqə (üç xidmətin cəmi)`
+      : 'Minimum iş aralığı üçün üç xidmətin müddətini yazın';
+  }
+
+  function fill(data) {
+    Object.keys(inputs).forEach(k => delete inputs[k]);
+    const rows = data.services.map(s => {
+      const inp = $('input', {
+        type: 'number', inputMode: 'numeric', min: '5', max: '240', step: '5',
+        placeholder: 'dəqiqə', value: s.durationMinutes == null ? '' : String(s.durationMinutes)
+      });
+      inp.oninput = updateSum;
+      inputs[s.code] = inp;
+      return $('div', {}, $('label', { textContent: `${s.name} (dəqiqə)` }), inp);
+    });
+    box.replaceChildren(title,
+      $('p', { className: 'muted', textContent: 'Hər xidmətin nə qədər vaxt apardığını yazın.' }),
+      ...rows, sum, save, note);
+    updateSum();
+  }
+
+  async function load() {
+    box.replaceChildren(title, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/services');
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 200 && r.data) fill(r.data);
+    else box.replaceChildren(title, $('div', { className: 'msg', textContent: 'Xidmətləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
+  }
+
+  save.onclick = async () => {
+    note.className = ''; note.textContent = '';
+    const services = Object.entries(inputs).map(([code, i]) => ({ code, durationMinutes: parseInt(i.value, 10) }));
+    const bad = services.some(s => !(s.durationMinutes >= 5 && s.durationMinutes <= 240 && s.durationMinutes % 5 === 0));
+    if (bad) {
+      note.className = 'msg';
+      note.textContent = 'Hər müddət 5 ilə 240 dəqiqə arasında və 5-in qatı olmalıdır';
+      return;
+    }
+    save.disabled = true;
+    const r = await call('PUT', '/api/panel/services', { services });
+    save.disabled = false;
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 200 && r.data) {
+      fill(r.data);
+      note.className = 'msg ok';
+      note.textContent = 'Saxlanıldı';
+    } else {
+      note.className = 'msg';
+      note.textContent = r.status === 400
+        ? 'Müddətlər düzgün deyil (5-240 dəqiqə, 5-in qatı)'
+        : 'Xəta baş verdi, yenidən cəhd edin';
+    }
+  };
+
+  load();
+  return box;
+}
+
 function showPanel() {
   logoutBtn.hidden = false;
   const dateInput = $('input', { type: 'date', value: date, min: todayKey, max: maxKey });
@@ -260,6 +329,7 @@ function showPanel() {
     $('div', { className: 'panel' },
       $('h2', { textContent: `${me.masterName} @ ${me.shopName}` }),
       $('label', { textContent: 'Gün' }), dateInput),
+    servicesPanel(),
     $('div', { className: 'panel' },
       $('h2', { textContent: 'Saat yarat' }),
       $('div', { className: 'two' },
