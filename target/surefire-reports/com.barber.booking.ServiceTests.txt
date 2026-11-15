@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.barber.booking.ServiceTests
 -------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.774 s -- in com.barber.booking.ServiceTests
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.927 s -- in com.barber.booking.ServiceTests

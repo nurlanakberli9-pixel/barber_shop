@@ -42,6 +42,18 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
 .toast.ok{background:#1b8a39}
 .toast.err{background:#a32020}
+.win{border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:12px}
+.win>*+*{margin-top:10px}
+.wh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.wh+.wh{margin-top:10px}
+.wh label{margin:0}
+.wh select{width:auto;min-width:96px}
+.cubes{display:flex;flex-wrap:wrap;gap:8px}
+.cube{display:flex;align-items:center;gap:4px;background:#3f5470;color:#fff;border-radius:10px;padding:4px 4px 4px 10px;font-size:14px}
+.cube button{background:none;color:#fff;padding:0;min-width:34px;min-height:34px;font-size:16px}
+.addcube{background:#e3e7ee;color:#1c2536;padding:8px 10px;font-size:14px}
+.werr{color:#a11;font-size:13px}
+.stalenote{font-size:13px;color:#8a5a00;background:#fff4d6;border-radius:10px;padding:10px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -195,12 +207,231 @@ function servicesPanel() {
       fill(r.data);
       note.className = 'msg ok';
       note.textContent = 'Saxlanıldı';
+      if (refreshDurations) refreshDurations();
     } else {
       note.className = 'msg';
       note.textContent = r.status === 400
         ? 'Müddətlər düzgün deyil (5-240 dəqiqə, 5-in qatı)'
         : 'Xəta baş verdi, yenidən cəhd edin';
     }
+  };
+
+  load();
+  return box;
+}
+
+let reloadWindows = null;
+let refreshDurations = null;
+let windowsDirty = () => false;
+
+function windowsPanel() {
+  const KINDS = ['HAIRCUT', 'WASH', 'BEARD'];
+  const NAMES = { HAIRCUT: 'Saç kəsimi', WASH: 'Saç yuma', BEARD: 'Saqqal kəsimi' };
+  const ICONS = { HAIRCUT: '✂️', WASH: '🚿', BEARD: '🧔' };
+  const MAX_WINDOWS = 20;
+  const WORK_START = 8 * 60;
+  const WORK_END = 22 * 60;
+  const box = $('div', { className: 'panel' });
+  const title = $('h2', { textContent: 'İş aralıqları' });
+  let dur = null;
+  let wins = [];
+  let dirty = false;
+  let stale = false;
+  let token = 0;
+  let note = null;
+  let addCount = 1;
+
+  const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  const toMin = t => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10);
+
+  function setDurations(data) {
+    const m = {};
+    let ok = true;
+    data.services.forEach(x => { if (x.durationMinutes == null) ok = false; else m[x.code] = x.durationMinutes; });
+    dur = ok && KINDS.every(k => m[k] > 0) ? m : null;
+  }
+
+  function fromServer(list) {
+    wins = [];
+    stale = false;
+    let prevEnd = null;
+    list.forEach(x => {
+      const start = toMin(x.startTime);
+      if (dur && x.cubes.some(c => c.minutes !== dur[c.code])) stale = true;
+      wins.push({ manual: prevEnd === null || start !== prevEnd, start, cubes: x.cubes.map(c => c.code) });
+      prevEnd = start + x.totalMinutes;
+    });
+  }
+
+  function layout() {
+    let prevEnd = null;
+    return wins.map(w => {
+      const total = w.cubes.reduce((a, c) => a + dur[c], 0);
+      const start = (w.manual || prevEnd === null) ? w.start : prevEnd;
+      const end = start + total;
+      let err = '';
+      if (total === 0) err = 'Pəncərədə ən azı bir kub olmalıdır';
+      else if (start < WORK_START || end > WORK_END) err = 'Pəncərə 08:00-22:00 aralığından çıxır';
+      else if (prevEnd !== null && start < prevEnd) err = 'Əvvəlki pəncərə ilə üst-üstə düşür';
+      prevEnd = end;
+      return { start, end, total, err };
+    });
+  }
+
+  function touch() { dirty = true; note = null; render(); }
+
+  function card(w, i, x) {
+    const head = $('div', { className: 'wh' },
+      $('b', { textContent: `Pəncərə ${i + 1}` }),
+      $('span', { className: 'muted', textContent: `${fmt(x.start)} – ${fmt(x.end)} · ${x.total} dəq` }));
+
+    const startRow = $('div', { className: 'wh' });
+    if (i === 0 || w.manual) {
+      const sel = $('select');
+      const opts = [];
+      for (let m = WORK_START; m < WORK_END; m += 15) opts.push(m);
+      if (!opts.includes(x.start)) { opts.push(x.start); opts.sort((a, b) => a - b); }
+      opts.forEach(m => sel.append($('option', { value: String(m), textContent: fmt(m) })));
+      sel.value = String(x.start);
+      sel.onchange = () => { w.start = parseInt(sel.value, 10); w.manual = true; touch(); };
+      startRow.append($('label', { textContent: 'Başlama' }), sel);
+      if (i > 0) {
+        const b = $('button', { className: 'small ghost', textContent: 'Ardıcıl et' });
+        b.onclick = () => { w.manual = false; touch(); };
+        startRow.append(b);
+      }
+    } else {
+      startRow.append($('span', { className: 'muted', textContent: 'Əvvəlki pəncərənin ardınca' }));
+      const b = $('button', { className: 'small ghost', textContent: 'Vaxtı seç' });
+      b.onclick = () => { w.manual = true; w.start = x.start; touch(); };
+      startRow.append(b);
+    }
+
+    const cubes = $('div', { className: 'cubes' });
+    w.cubes.forEach(code => {
+      const rm = $('button', { textContent: '✕', ariaLabel: 'Kubu sil' });
+      rm.onclick = () => { w.cubes = w.cubes.filter(c => c !== code); touch(); };
+      cubes.append($('span', { className: 'cube' },
+        $('span', { textContent: `${ICONS[code]} ${NAMES[code]} · ${dur[code]} dəq` }), rm));
+    });
+    KINDS.filter(k => !w.cubes.includes(k)).forEach(k => {
+      const b = $('button', { className: 'addcube', textContent: `+ ${NAMES[k]} (${dur[k]})` });
+      b.onclick = () => {
+        w.cubes.push(k);
+        w.cubes.sort((a, c) => KINDS.indexOf(a) - KINDS.indexOf(c));
+        touch();
+      };
+      cubes.append(b);
+    });
+
+    const del = $('button', { className: 'small ghost', textContent: 'Pəncərəni sil' });
+    del.onclick = () => { wins.splice(i, 1); touch(); };
+
+    const el = $('div', { className: 'win' }, head, startRow, cubes, del);
+    if (x.err) el.append($('div', { className: 'werr', textContent: x.err }));
+    return el;
+  }
+
+  function render() {
+    if (!dur) {
+      box.replaceChildren(title, $('div', { className: 'msg', textContent: 'Əvvəl yuxarıdakı Xidmətlərim bölməsində üç xidmətin müddətini yazıb saxlayın.' }));
+      return;
+    }
+    const info = layout();
+    const hasErr = info.some(x => x.err);
+    const d = new Date(date + 'T00:00:00');
+
+    const countSel = $('select');
+    for (let n = 1; n <= 10; n++) countSel.append($('option', { value: String(n), textContent: String(n) }));
+    countSel.value = String(addCount);
+    countSel.style.width = '80px';
+    countSel.onchange = () => { addCount = parseInt(countSel.value, 10); };
+    const addBtn = $('button', { className: 'small ghost', textContent: 'Pəncərə əlavə et' });
+    addBtn.onclick = () => {
+      const room = MAX_WINDOWS - wins.length;
+      if (room <= 0) { toast('Bir günə ən çox 20 pəncərə olar', 'err'); return; }
+      for (let n = 0; n < Math.min(addCount, room); n++) {
+        wins.push({ manual: wins.length === 0, start: 10 * 60, cubes: [] });
+      }
+      touch();
+    };
+    const fillBtn = $('button', { className: 'small ghost', textContent: 'Hamısını 3 kubla doldur' });
+    fillBtn.onclick = () => {
+      if (!wins.length) { toast('Əvvəl pəncərə əlavə edin', 'err'); return; }
+      wins.forEach(w => { w.cubes = KINDS.slice(); });
+      touch();
+    };
+    const clearBtn = $('button', { className: 'small ghost', textContent: 'Hamısını təmizlə' });
+    clearBtn.onclick = () => {
+      if (wins.length && confirm('Bütün pəncərələr silinsin? Saxlamayana qədər serverdə dəyişmir.')) { wins = []; touch(); }
+    };
+    const saveBtn = $('button', { className: 'green full', textContent: 'Yadda saxla' });
+    saveBtn.disabled = !dirty || hasErr;
+    saveBtn.onclick = async () => {
+      saveBtn.disabled = true;
+      const saveDate = date;
+      const payload = { windows: wins.map((w, i) => ({ startTime: fmt(info[i].start), cubes: w.cubes })) };
+      const r = await call('PUT', `/api/panel/windows?date=${saveDate}`, payload);
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && Array.isArray(r.data)) {
+        if (date !== saveDate) { toast('Saxlanıldı', 'ok'); load(); return; }
+        fromServer(r.data);
+        dirty = false;
+        note = { ok: true, text: 'Saxlanıldı' };
+      } else {
+        note = {
+          ok: false,
+          text: r.status === 409 ? 'Əvvəl Xidmətlərim bölməsində müddətləri yazıb saxlayın'
+            : r.status === 400 ? 'Pəncərələr düzgün deyil (vaxt aralığı və ya üst-üstə düşmə)'
+            : 'Xəta baş verdi, yenidən cəhd edin'
+        };
+      }
+      render();
+    };
+
+    const els = [
+      title,
+      $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · pəncərənin uzunluğu içindəki kubların cəmidir` }),
+      $('div', { className: 'wh' }, countSel, addBtn),
+      $('div', { className: 'wh' }, fillBtn, clearBtn)
+    ];
+    if (wins.length) wins.forEach((w, i) => els.push(card(w, i, info[i])));
+    else els.push($('p', { className: 'muted', textContent: 'Bu gün üçün iş aralığı yoxdur. Yuxarıdan pəncərə əlavə edin.' }));
+    if (stale) els.push($('div', { className: 'stalenote', textContent: 'Xidmət müddətləri dəyişib. Saxlayanda pəncərələr yeni müddətlərlə hesablanacaq.' }));
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    els.push(saveBtn);
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    const t = ++token;
+    box.replaceChildren(title, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const [sv, wr] = await Promise.all([
+      call('GET', '/api/panel/services'),
+      call('GET', `/api/panel/windows?date=${date}`)
+    ]);
+    if (t !== token) return;
+    if (sv.status === 401 || wr.status === 401) return sessionExpired();
+    if (sv.status !== 200 || wr.status !== 200 || !sv.data || !Array.isArray(wr.data)) {
+      box.replaceChildren(title, $('div', { className: 'msg', textContent: 'İş aralıqlarını yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    setDurations(sv.data);
+    fromServer(wr.data);
+    dirty = false;
+    note = null;
+    render();
+  }
+
+  reloadWindows = load;
+  windowsDirty = () => dirty;
+  refreshDurations = async () => {
+    const r = await call('GET', '/api/panel/services');
+    if (r.status !== 200 || !r.data) return;
+    const before = JSON.stringify(dur);
+    setDurations(r.data);
+    if (before !== JSON.stringify(dur) && wins.length) { stale = true; dirty = true; }
+    render();
   };
 
   load();
@@ -227,8 +458,13 @@ function showPanel() {
       dateInput.value = date;
       return;
     }
+    if (windowsDirty() && !confirm('Saxlanılmamış pəncərə dəyişiklikləri var. Gün dəyişsin?')) {
+      dateInput.value = date;
+      return;
+    }
     date = v;
     loadDay();
+    if (reloadWindows) reloadWindows();
   };
 
   createBtn.onclick = async () => {
@@ -330,14 +566,10 @@ function showPanel() {
       $('h2', { textContent: `${me.masterName} @ ${me.shopName}` }),
       $('label', { textContent: 'Gün' }), dateInput),
     servicesPanel(),
+    windowsPanel(),
     $('div', { className: 'panel' },
-      $('h2', { textContent: 'Saat yarat' }),
-      $('div', { className: 'two' },
-        $('div', {}, $('label', { textContent: 'Başlama' }), from),
-        $('div', {}, $('label', { textContent: 'Bitmə' }), to)),
-      $('p', { className: 'muted', textContent: 'Hər tam saat üçün bir xana yaradılır. Artıq olan saatlar atlanır.' }),
-      createBtn, createNote),
-    $('div', { className: 'panel' }, list));
+      $('p', { className: 'muted', textContent: 'Köhnə saatlıq rezervlər (müvəqqəti, müştəri sayı yeni modelə keçənə qədər)' }),
+      list));
   loadDay();
 }
 
