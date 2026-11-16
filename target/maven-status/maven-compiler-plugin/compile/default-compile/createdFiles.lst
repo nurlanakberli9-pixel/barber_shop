@@ -1,4 +1,5 @@
 com/barber/booking/PublicBookingController$GapDto.class
+com/barber/booking/PanelBookingController.class
 com/barber/booking/BookingController$BookRequest.class
 com/barber/booking/BookingController$ShopDto.class
 com/barber/booking/BookingController$DaySlotDto.class
@@ -26,7 +27,9 @@ com/barber/booking/WindowController$CubeDto.class
 com/barber/booking/PublicBookingController$CubeDto.class
 com/barber/booking/AuthController$Me.class
 com/barber/booking/BarbershopRepository.class
+com/barber/booking/PanelBookingController$ServiceRef.class
 com/barber/booking/WindowCube.class
+com/barber/booking/PanelBookingController$BookingRow.class
 com/barber/booking/BookingController$SlotDto.class
 com/barber/booking/ServiceController$ServiceUpdate.class
 com/barber/booking/Barbershop.class

@@ -56,6 +56,12 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .stalenote{font-size:13px;color:#8a5a00;background:#fff4d6;border-radius:10px;padding:10px;margin-top:10px}
 .auto{background:#f3f6fb;border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:12px}
 .auto>*+*{margin-top:10px}
+.selbox{display:flex;align-items:center;gap:8px;color:#1c2536;font-size:15px}
+.selbox input{width:22px;height:22px;padding:0;margin:0}
+.cancelled{background:#fff4d6;border-radius:12px;padding:12px;margin-bottom:10px;font-size:14px}
+.cancelled .crow{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #f0e2b6}
+.cancelled a{color:#2f6fb0}
+.cancelled button{margin-top:8px}
 </style>
 </head>
 <body>
@@ -284,9 +290,23 @@ function windowsPanel() {
 
   function touch() { dirty = true; note = null; render(); }
 
+  function removeWindows(pred) {
+    const info = layout();
+    let removed = false;
+    const keep = [];
+    wins.forEach((w, i) => {
+      if (pred(w, i)) { removed = true; return; }
+      if (removed) { w.start = info[i].start; w.manual = true; }
+      keep.push(w);
+    });
+    wins = keep;
+  }
+
   function card(w, i, x) {
+    const chk = $('input', { type: 'checkbox', checked: !!w.sel, ariaLabel: 'Seç' });
+    chk.onchange = () => { w.sel = chk.checked; };
     const head = $('div', { className: 'wh' },
-      $('b', { textContent: `Pəncərə ${i + 1}` }),
+      $('label', { className: 'selbox' }, chk, $('b', { textContent: `Pəncərə ${i + 1}` })),
       $('span', { className: 'muted', textContent: `${fmt(x.start)} – ${fmt(x.end)} · ${x.total} dəq` }));
 
     const startRow = $('div', { className: 'wh' });
@@ -329,7 +349,7 @@ function windowsPanel() {
     });
 
     const del = $('button', { className: 'small ghost', textContent: 'Pəncərəni sil' });
-    del.onclick = () => { wins.splice(i, 1); touch(); };
+    del.onclick = () => { removeWindows((x, j) => j === i); touch(); };
 
     const el = $('div', { className: 'win' }, head, startRow, cubes, del);
     if (x.err) el.append($('div', { className: 'werr', textContent: x.err }));
@@ -365,9 +385,15 @@ function windowsPanel() {
       wins.forEach(w => { w.cubes = KINDS.slice(); });
       touch();
     };
-    const clearBtn = $('button', { className: 'small ghost', textContent: 'Hamısını təmizlə' });
+    const clearBtn = $('button', { className: 'small ghost', textContent: 'Hamısını sil' });
     clearBtn.onclick = () => {
       if (wins.length && confirm('Bütün pəncərələr silinsin? Saxlamayana qədər serverdə dəyişmir.')) { wins = []; touch(); }
+    };
+    const delSel = $('button', { className: 'small ghost', textContent: 'Seçilənləri sil' });
+    delSel.onclick = () => {
+      if (!wins.some(w => w.sel)) { toast('Əvvəl silinəcək pəncərələri seçin', 'err'); return; }
+      removeWindows(w => w.sel);
+      touch();
     };
     const saveBtn = $('button', { className: 'green full', textContent: 'Yadda saxla' });
     saveBtn.disabled = !dirty || hasErr;
@@ -375,17 +401,37 @@ function windowsPanel() {
       saveBtn.disabled = true;
       const saveDate = date;
       const payload = { windows: wins.map((w, i) => ({ startTime: fmt(info[i].start), cubes: w.cubes })) };
-      const r = await call('PUT', `/api/panel/windows?date=${saveDate}`, payload);
+      const sortedSpans = info.map(x => [x.start, x.end]).sort((a, b) => a[0] - b[0]);
+      const mergedSpans = [];
+      sortedSpans.forEach(([a, b]) => {
+        const last = mergedSpans[mergedSpans.length - 1];
+        if (last && a <= last[1]) last[1] = Math.max(last[1], b); else mergedSpans.push([a, b]);
+      });
+      const stranded = dayBookings.filter(b => {
+        const bs = toMin(b.start), be = toMin(b.end);
+        return !mergedSpans.some(m => m[0] <= bs && be <= m[1]);
+      });
+      if (stranded.length) {
+        const lines = stranded.map(b => `${b.start}–${b.end}  ${b.customerName}  ${b.customerPhone}`).join('\n');
+        if (!confirm(`Bu dəyişiklik ${stranded.length} rezervi ləğv edəcək:\n\n${lines}\n\nMüştərilərə xəbər getməyəcək, özünüz zəng edin. Davam edək?`)) {
+          saveBtn.disabled = false;
+          return;
+        }
+      }
+      const cancelQuery = stranded.length ? '&cancelBookingIds=' + stranded.map(b => b.id).join(',') : '';
+      const r = await call('PUT', `/api/panel/windows?date=${saveDate}${cancelQuery}`, payload);
       if (r.status === 401) return sessionExpired();
       if (r.status === 200 && Array.isArray(r.data)) {
         if (date !== saveDate) { toast('Saxlanıldı', 'ok'); load(); return; }
         fromServer(r.data);
         dirty = false;
         note = { ok: true, text: 'Saxlanıldı' };
+        if (stranded.length && showCancelled) showCancelled(stranded);
+        if (reloadBookings) reloadBookings();
       } else {
         note = {
           ok: false,
-          text: r.status === 409 ? 'Əvvəl Xidmətlərim bölməsində müddətləri yazıb saxlayın'
+          text: r.status === 409 ? (reloadBookings && reloadBookings(), 'Pəncərələr saxlanmadı: xidmət müddətləri yazılmayıb və ya yeni rezerv gəlib. Rezervlər yeniləndi, yenidən cəhd edin')
             : r.status === 400 ? 'Pəncərələr düzgün deyil (vaxt aralığı və ya üst-üstə düşmə)'
             : 'Xəta baş verdi, yenidən cəhd edin'
         };
@@ -441,7 +487,7 @@ function windowsPanel() {
       $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · pəncərənin uzunluğu içindəki kubların cəmidir` }),
       autoBox,
       $('div', { className: 'wh' }, countSel, addBtn),
-      $('div', { className: 'wh' }, fillBtn, clearBtn)
+      $('div', { className: 'wh' }, fillBtn, clearBtn, delSel)
     ];
     if (wins.length) wins.forEach((w, i) => els.push(card(w, i, info[i])));
     else els.push($('p', { className: 'muted', textContent: 'Bu gün üçün iş aralığı yoxdur. Yuxarıdan pəncərə əlavə edin.' }));
@@ -486,6 +532,86 @@ function windowsPanel() {
   return box;
 }
 
+let dayBookings = [];
+let reloadBookings = null;
+let showCancelled = null;
+
+function phoneNode(p) {
+  return /^\+?[0-9]{9,15}$/.test(p)
+    ? $('a', { href: 'tel:' + p, textContent: p })
+    : $('span', { textContent: p });
+}
+
+function bookingsPanel() {
+  const box = $('div', { className: 'panel' });
+  const cancelledBox = $('div');
+  const list = $('div');
+  let kept = [];
+  let token = 0;
+
+  function renderCancelled() {
+    if (!kept.length) { cancelledBox.replaceChildren(); return; }
+    const close = $('button', { className: 'small ghost', textContent: 'Bağla' });
+    close.onclick = () => { kept = []; renderCancelled(); };
+    const wrap = $('div', { className: 'cancelled' },
+      $('b', { textContent: 'Ləğv edilən rezervlər. Müştərilərə zəng edib xəbər verin:' }));
+    kept.forEach(b => wrap.append($('div', { className: 'crow' },
+      $('span', { textContent: `${b.start}–${b.end} · ${b.customerName}` }),
+      phoneNode(b.customerPhone))));
+    wrap.append(close);
+    cancelledBox.replaceChildren(wrap);
+  }
+
+  showCancelled = items => {
+    if (!items || !items.length) return;
+    kept = kept.concat(items);
+    renderCancelled();
+  };
+
+  function row(b) {
+    const info = $('div', { className: 'info' }, $('b', { textContent: b.customerName }));
+    info.append(phoneNode(b.customerPhone));
+    info.append($('span', { textContent: `${b.services.map(x => x.name).join(' + ')} · ${b.minutes} dəq` }));
+    const cancel = $('button', { className: 'small danger', textContent: 'Ləğv et' });
+    cancel.onclick = async () => {
+      if (!confirm(`${b.start}–${b.end} rezervi (${b.customerName}) ləğv edilsin? Müştəriyə xəbər getməyəcək, özünüz zəng edin.`)) return;
+      cancel.disabled = true;
+      const r = await call('POST', `/api/panel/bookings/${b.id}/cancel`);
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 204) { showCancelled([b]); toast('Rezerv ləğv edildi', 'ok'); }
+      else if (r.status === 404) toast('Bu rezerv artıq yoxdur', 'err');
+      else toast('Xəta baş verdi', 'err');
+      load();
+    };
+    return $('div', { className: 'row' },
+      $('div', { className: 'time', textContent: b.start }), info, cancel);
+  }
+
+  async function load() {
+    const t = ++token;
+    list.replaceChildren($('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', `/api/panel/bookings?date=${date}`);
+    if (t !== token) return;
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      dayBookings = [];
+      list.replaceChildren($('div', { className: 'msg', textContent: 'Rezervləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    dayBookings = r.data;
+    const d = new Date(date + 'T00:00:00');
+    list.replaceChildren(
+      $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · ${r.data.length} rezerv` }),
+      ...(r.data.length ? r.data.map(row)
+        : [$('p', { className: 'muted', textContent: 'Bu gün üçün rezerv yoxdur.' })]));
+  }
+
+  box.append($('h2', { textContent: 'Rezervlər' }), cancelledBox, list);
+  reloadBookings = load;
+  load();
+  return box;
+}
+
 function showPanel() {
   logoutBtn.hidden = false;
   const dateInput = $('input', { type: 'date', value: date, min: todayKey, max: maxKey });
@@ -513,6 +639,7 @@ function showPanel() {
     date = v;
     loadDay();
     if (reloadWindows) reloadWindows();
+    if (reloadBookings) reloadBookings();
   };
 
   createBtn.onclick = async () => {
@@ -613,6 +740,7 @@ function showPanel() {
     $('div', { className: 'panel' },
       $('h2', { textContent: `${me.masterName} @ ${me.shopName}` }),
       $('label', { textContent: 'Gün' }), dateInput),
+    bookingsPanel(),
     servicesPanel(),
     windowsPanel(),
     $('div', { className: 'panel' },

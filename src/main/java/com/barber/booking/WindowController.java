@@ -68,6 +68,7 @@ public class WindowController {
     @Transactional
     public List<WindowDto> replace(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) List<Long> cancelBookingIds,
             @Valid @RequestBody WindowsRequest req, Authentication auth) {
         record Plan(int start, List<ServiceKind> kinds, int total) {}
 
@@ -106,7 +107,9 @@ public class WindowController {
 
         List<int[]> spans = new ArrayList<>();
         for (Plan p : plans) spans.add(new int[] {p.start(), p.start() + p.total()});
-        guard.assertBookingsStillFit(shop.getId(), date, spans);
+        guard.assertBookingsStillFit(shop.getId(), date, spans,
+                new java.util.HashSet<Long>(
+                        cancelBookingIds == null ? List.<Long>of() : cancelBookingIds));
 
         List<WorkWindow> old = windows.findByBarbershopIdAndWindowDateOrderByStartTime(
                 shop.getId(), date);
