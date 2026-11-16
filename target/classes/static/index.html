@@ -21,7 +21,7 @@ main{max-width:960px;margin:0 auto;padding:16px}
 .stars{color:#f5a623;font-size:14px;margin:4px 0 8px}
 .btn{background:#22a845;color:#fff;border:0;border-radius:8px;padding:10px;font:inherit;font-weight:600;cursor:pointer;width:calc(100% - 24px)}
 .btn:active{background:#1b8a39}
-.btn:disabled{opacity:.6}
+.btn:disabled{opacity:.5;cursor:default}
 .link{background:none;border:0;color:#3f5470;font:inherit;cursor:pointer;padding:0;margin-bottom:12px}
 .panel{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
 .head{display:flex;align-items:center;gap:12px}
@@ -45,16 +45,13 @@ main{max-width:960px;margin:0 auto;padding:16px}
 .bars i{width:7px;height:7px;border-radius:2px;background:#ccd}
 .bars i.g{background:#22a845}
 .bars i.r{background:#a32020}
-.legend{display:flex;gap:14px;font-size:13px;color:#667;margin:8px 0 4px;flex-wrap:wrap}
-.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;background:var(--c)}
-.block{margin-top:14px}
-.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-.slot{border:0;border-radius:10px;padding:13px 0;font:inherit;font-weight:600;color:#fff}
-.slot.free{background:#22a845;cursor:pointer}
-.slot.free:active{background:#1b8a39}
-.slot.booked{background:#a32020}
-.slot.past{background:#d5d8de;color:#7b8190}
-.slot:disabled{cursor:default}
+.gapline{font-size:14px;color:#146c2e;background:#d9f5e0;border-radius:10px;padding:8px 10px;margin-top:8px}
+.wcard{background:#fff;border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:10px;cursor:pointer}
+.wcard.full{opacity:.55;cursor:default}
+.wcard .top{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+.okfree{color:#1b8a39;font-size:14px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{background:#eef0f4;border-radius:8px;padding:3px 8px;font-size:12px}
 .overlay{position:fixed;inset:0;background:rgba(10,15,25,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:16px;max-height:92vh;overflow-y:auto}
 .sheet .bar{display:flex;justify-content:space-between;align-items:center;background:#3f5470;color:#fff;margin:-16px -16px 12px;padding:14px 16px;border-radius:18px 18px 0 0}
@@ -64,6 +61,10 @@ main{max-width:960px;margin:0 auto;padding:16px}
 .row span{color:#667}
 .sheet input{width:100%;margin-top:10px;padding:12px;border:1px solid #ccd;border-radius:10px;font:inherit}
 .sheet .btn{width:100%;margin-top:14px;padding:14px}
+.cubes{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.cubebtn{font:inherit;text-align:left;border:1px solid #c5ccd8;border-radius:10px;background:#fff;color:#1c2536;padding:12px;cursor:pointer}
+.cubebtn.on{background:#3f5470;color:#fff;border-color:#3f5470}
+.cubebtn:disabled{opacity:.4;cursor:default}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
 .toast.ok{background:#1b8a39}
 .toast.err{background:#a32020}
@@ -78,7 +79,7 @@ const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.ass
 const COLORS = ['#c0562f', '#2f7bc0', '#7b4fc0', '#2fa086', '#b8860b', '#c02f6b'];
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
 const WD = ['Baz', 'B.e', 'Ç.a', 'Çər', 'C.a', 'Cüm', 'Şən'];
-const BLOCKS = [['🌅 Səhər', '09:00-12:00', 9, 12], ['☀️ Gündüz', '12:00-17:00', 12, 17], ['🌙 Axşam', '17:00-21:00', 17, 21]];
+const ICONS = { HAIRCUT: '✂️', WASH: '🚿', BEARD: '🧔' };
 const pad = n => String(n).padStart(2, '0');
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 let shops = [];
@@ -97,6 +98,15 @@ function avatar(s) {
 function stars(r) {
   const full = Math.round(r);
   return '★'.repeat(full) + '☆'.repeat(5 - full) + ' ' + r.toFixed(1);
+}
+async function getJson(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return { status: r.status, data: null };
+    return { status: r.status, data: await r.json() };
+  } catch (e) {
+    return { status: 0, data: null };
+  }
 }
 
 function homeView() {
@@ -139,15 +149,14 @@ async function shopView(s) {
   app.replaceChildren(back, head, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
 
   let avail = {};
-  async function loadAvail() {
-    const r = await fetch(`/api/shops/${s.id}/availability?days=60`);
-    if (!r.ok) throw new Error(r.status);
+  async function loadCalendar() {
+    const r = await getJson(`/api/shops/${s.id}/calendar?days=60`);
+    if (r.status !== 200 || !Array.isArray(r.data) || !r.data.length) return false;
     avail = {};
-    (await r.json()).forEach(d => { avail[d.date] = d; });
+    r.data.forEach(d => { avail[d.date] = d; });
+    return true;
   }
-  try {
-    await loadAvail();
-  } catch (e) {
+  if (!(await loadCalendar())) {
     app.replaceChildren(back, head, $('div', { className: 'msg', textContent: 'Tarixləri yükləmək alınmadı. Yenidən cəhd edin.' }));
     return;
   }
@@ -172,10 +181,12 @@ async function shopView(s) {
   function bars(key, past) {
     const st = avail[key];
     const wrap = $('div', { className: 'bars' });
-    let g = 0;
-    if (!past && st && st.total > 0 && st.free > 0) g = Math.max(1, Math.round(st.free / st.total * 5));
-    const showRed = !past && st && st.total > 0;
-    for (let i = 0; i < 5; i++) wrap.append($('i', { className: i < g ? 'g' : showRed ? 'r' : '' }));
+    let g = 0, red = false;
+    if (!past && st && st.windowMinutes > 0) {
+      red = true;
+      if (st.freeMinutes > 0) g = Math.max(1, Math.round(st.freeMinutes / st.windowMinutes * 5));
+    }
+    for (let i = 0; i < 5; i++) wrap.append($('i', { className: i < g ? 'g' : red ? 'r' : '' }));
     return wrap;
   }
 
@@ -191,7 +202,7 @@ async function shopView(s) {
       const date = new Date(y, m, d);
       const key = iso(date);
       const past = key < todayKey;
-      const b = $('button', { className: 'day', disabled: past },
+      const b = $('button', { className: 'day', disabled: past || !avail[key] },
         $('small', { textContent: WD[date.getDay()] }),
         $('b', { textContent: String(d) }),
         bars(key, past));
@@ -212,99 +223,136 @@ async function shopView(s) {
 
   function select(key) { selected = key; markSelected(); }
 
+  function windowCard(x) {
+    const minCube = Math.min(...x.cubes.map(c => c.minutes));
+    const full = x.fitMinutes < minCube;
+    const tags = $('div', { className: 'tags' },
+      ...x.cubes.map(c => $('span', { className: 'tag', textContent: `${ICONS[c.code] || ''} ${c.name} · ${c.minutes} dəq` })));
+    const c = $('div', { className: 'wcard' + (full ? ' full' : '') },
+      $('div', { className: 'top' },
+        $('span', { textContent: `${x.start} – ${x.end}` }),
+        $('span', { className: full ? 'muted' : 'okfree', textContent: full ? 'Dolu' : `Boş: ${x.freeMinutes} dəq` })),
+      tags);
+    if (!full) c.onclick = () => openSheet(x);
+    return c;
+  }
+
   async function renderDetail() {
     const token = ++dayToken;
     const d = new Date(selected + 'T00:00:00');
-    detail.replaceChildren($('p', { className: 'muted', textContent: 'Saatlar yüklənir...' }));
-    let slots;
-    try {
-      const r = await fetch(`/api/shops/${s.id}/day?date=${selected}`);
-      if (!r.ok) throw new Error(r.status);
-      slots = await r.json();
-    } catch (e) {
-      if (token !== dayToken) return;
-      detail.replaceChildren($('div', { className: 'msg', textContent: 'Saatları yükləmək alınmadı. Başqa gün seçib yenidən cəhd edin.' }));
+    detail.replaceChildren($('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const [w, g] = await Promise.all([
+      getJson(`/api/shops/${s.id}/windows?date=${selected}`),
+      getJson(`/api/shops/${s.id}/gaps?date=${selected}`)
+    ]);
+    if (token !== dayToken) return;
+    if (w.status !== 200 || !Array.isArray(w.data)) {
+      detail.replaceChildren($('div', { className: 'msg', textContent: 'Məlumatı yükləmək alınmadı. Başqa gün seçib yenidən cəhd edin.' }));
       return;
     }
-    if (token !== dayToken) return;
-    const legend = $('div', { className: 'legend' },
-      $('span', { textContent: 'Boş' }), $('span', { textContent: 'Dolu' }), $('span', { textContent: 'Keçmiş' }));
-    const sp = legend.children;
-    sp[0].style.setProperty('--c', '#22a845');
-    sp[1].style.setProperty('--c', '#a32020');
-    sp[2].style.setProperty('--c', '#d5d8de');
-    const els = [$('b', { textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}` }), legend];
-    BLOCKS.forEach(([name, range, from, to]) => {
-      const items = slots.filter(x => { const h = +x.startTime.slice(11, 13); return h >= from && h < to; });
-      const grid = $('div', { className: 'slots' });
-      items.forEach(x => {
-        const b = $('button', {
-          className: 'slot ' + x.status.toLowerCase(),
-          textContent: x.startTime.slice(11, 16),
-          disabled: x.status !== 'FREE'
-        });
-        if (x.status === 'FREE') b.onclick = () => openSheet(x);
-        grid.append(b);
-      });
-      els.push($('div', { className: 'block' },
-        $('b', { textContent: name + ' ' + range }),
-        items.length ? grid : $('p', { className: 'muted', textContent: 'Bu bölmədə saat yoxdur' })));
-    });
+    const els = [$('b', { textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}` })];
+    if (!w.data.length) {
+      els.push($('p', { className: 'muted', textContent: 'Bu gün üçün bərbərin iş aralığı yoxdur.' }));
+      detail.replaceChildren(...els);
+      return;
+    }
+    if (g.status === 200 && Array.isArray(g.data) && g.data.length) {
+      els.push($('div', { className: 'gapline', textContent: 'Boş vaxt: ' + g.data.map(x => `${x.start}–${x.end} (${x.minutes} dəq)`).join(', ') }));
+    }
+    w.data.forEach(x => els.push(windowCard(x)));
     detail.replaceChildren(...els);
   }
 
   async function refreshAll() {
-    try { await loadAvail(); } catch (e) {}
+    await loadCalendar();
     buildStrip();
   }
 
-  function openSheet(slot) {
-    const time = slot.startTime.slice(11, 16);
+  function openSheet(w) {
     const d = new Date(selected + 'T00:00:00');
     const dateText = `${WD[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+    const chosen = new Set();
+    const total = () => w.cubes.filter(c => chosen.has(c.code)).reduce((a, c) => a + c.minutes, 0);
     const row = (k, v) => $('div', { className: 'row' }, $('span', { textContent: k }), $('b', { textContent: v }));
+    const cubeBox = $('div', { className: 'cubes' });
+    const sum = $('p', { className: 'muted' });
     const name = $('input', { placeholder: 'Adınız', maxLength: 60, autocomplete: 'name' });
     const phone = $('input', { placeholder: '+994501234567', type: 'tel', maxLength: 16, autocomplete: 'tel' });
     const err = $('div');
     const ok = $('button', { className: 'btn', textContent: 'TƏSDİQ ET' });
     const close = $('button', { className: 'x', textContent: '✕', ariaLabel: 'Bağla' });
     const overlay = $('div', { className: 'overlay' });
-    const sheet = $('div', { className: 'sheet' },
-      $('div', { className: 'bar' }, $('b', { textContent: 'One-Tap Rezerv' }), close),
-      row('Bərbər', s.masterName), row('Salon', s.name), row('Tarix', dateText), row('Saat', time),
-      name, phone, err, ok);
-    close.onclick = () => overlay.remove();
-    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    function paint() {
+      const t = total();
+      cubeBox.replaceChildren(...w.cubes.map(c => {
+        const on = chosen.has(c.code);
+        const b = $('button', {
+          type: 'button',
+          className: 'cubebtn' + (on ? ' on' : ''),
+          textContent: `${ICONS[c.code] || ''} ${c.name} · ${c.minutes} dəq`,
+          disabled: !on && t + c.minutes > w.fitMinutes
+        });
+        b.onclick = () => { if (on) chosen.delete(c.code); else chosen.add(c.code); paint(); };
+        return b;
+      }));
+      sum.textContent = t
+        ? `Seçildi: ${t} dəq (bu pəncərədə ən çox ${w.fitMinutes} dəq sığır)`
+        : `Xidmət seçin (bu pəncərədə ən çox ${w.fitMinutes} dəq sığır)`;
+      ok.disabled = t === 0;
+    }
+
     ok.onclick = async () => {
-      ok.disabled = true;
       err.className = ''; err.textContent = '';
-      let status = 0;
+      const n = name.value.trim();
+      const p = phone.value.trim();
+      if (!n || !/^\+?[0-9]{9,15}$/.test(p)) {
+        err.className = 'msg';
+        err.textContent = 'Ad və düzgün telefon yazın (məs. +994501234567)';
+        return;
+      }
+      ok.disabled = true;
+      let status = 0, data = null;
       try {
-        const r = await fetch(`/api/slots/${slot.id}/book`, {
+        const r = await fetch(`/api/shops/${s.id}/windows/${w.id}/bookings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.value.trim(), phone: phone.value.trim() })
+          body: JSON.stringify({ services: [...chosen], name: n, phone: p })
         });
         status = r.status;
+        if (status === 200) data = await r.json();
       } catch (e) { status = 0; }
-      if (status === 200) {
+      if (status === 200 && data) {
         overlay.remove();
-        toast(`Rezerv olundu: ${s.masterName}, ${dateText}, ${time}`, 'ok');
+        toast(`Rezerv olundu: ${s.masterName}, ${dateText}, ${data.start}–${data.end}`, 'ok');
         refreshAll();
       } else if (status === 409) {
         overlay.remove();
-        toast('Bu saat artıq tutulub, başqa saat seçin', 'err');
+        toast('Bu pəncərədə yer qalmayıb, boş vaxtlara yenidən baxın', 'err');
+        refreshAll();
+      } else if (status === 404) {
+        overlay.remove();
+        toast('Pəncərə tapılmadı, siyahı yenilənir', 'err');
         refreshAll();
       } else {
         ok.disabled = false;
         err.className = 'msg';
         err.textContent = status === 400
-          ? 'Ad və düzgün telefon yazın (məs. +994501234567)'
+          ? 'Ad, telefon və ya xidmət seçimi düzgün deyil'
           : 'Xəta baş verdi, bağlantını yoxlayıb yenidən cəhd edin';
       }
     };
+
+    close.onclick = () => overlay.remove();
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    const sheet = $('div', { className: 'sheet' },
+      $('div', { className: 'bar' }, $('b', { textContent: 'One-Tap Rezerv' }), close),
+      row('Bərbər', s.masterName), row('Salon', s.name), row('Tarix', dateText),
+      row('Pəncərə', `${w.start} – ${w.end}`),
+      cubeBox, sum, name, phone, err, ok);
     overlay.append(sheet);
     document.body.append(overlay);
+    paint();
   }
 
   prev.onclick = () => {
@@ -323,14 +371,13 @@ async function shopView(s) {
 }
 
 async function init() {
-  try {
-    const r = await fetch('/api/shops');
-    if (!r.ok) throw new Error(r.status);
-    shops = await r.json();
-    homeView();
-  } catch (e) {
+  const r = await getJson('/api/shops');
+  if (r.status !== 200 || !Array.isArray(r.data)) {
     app.replaceChildren($('div', { className: 'msg', textContent: 'Bərbərləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
+    return;
   }
+  shops = r.data;
+  homeView();
 }
 init();
 </script>

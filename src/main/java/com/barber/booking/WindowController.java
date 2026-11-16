@@ -43,12 +43,14 @@ public class WindowController {
     private final AppUserRepository users;
     private final ServiceTypeRepository types;
     private final WorkWindowRepository windows;
+    private final BookingGuard guard;
 
     public WindowController(AppUserRepository users, ServiceTypeRepository types,
-            WorkWindowRepository windows) {
+            WorkWindowRepository windows, BookingGuard guard) {
         this.users = users;
         this.types = types;
         this.windows = windows;
+        this.guard = guard;
     }
 
     @GetMapping
@@ -101,6 +103,10 @@ public class WindowController {
                 throw bad("Pəncərələr üst-üstə düşür");
             }
         }
+
+        List<int[]> spans = new ArrayList<>();
+        for (Plan p : plans) spans.add(new int[] {p.start(), p.start() + p.total()});
+        guard.assertBookingsStillFit(shop.getId(), date, spans);
 
         List<WorkWindow> old = windows.findByBarbershopIdAndWindowDateOrderByStartTime(
                 shop.getId(), date);

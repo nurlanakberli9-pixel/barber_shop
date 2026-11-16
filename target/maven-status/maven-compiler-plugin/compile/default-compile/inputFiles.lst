@@ -5,12 +5,17 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/AuthController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Barbershop.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BarbershopRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/Booking.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingApplication.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/BookingGuard.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/BookingRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/DataSeeder.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/DayPlanner.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginAttemptService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PanelController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/PublicBookingController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceKind.java

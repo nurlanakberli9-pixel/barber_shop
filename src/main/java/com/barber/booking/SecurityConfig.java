@@ -27,14 +27,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/panel.html", "/favicon.ico",
                         "/api/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/slots/*/book", "/api/login",
+                .requestMatchers(HttpMethod.POST, "/api/slots/*/book", "/api/shops/*/windows/*/bookings", "/api/login",
                         "/api/logout").permitAll()
                 .requestMatchers("/api/panel/**").hasRole("BARBER")
                 .anyRequest().denyAll())
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                .ignoringRequestMatchers("/api/slots/*/book"))
+                .ignoringRequestMatchers("/api/slots/*/book", "/api/shops/*/windows/*/bookings"))
             .formLogin(f -> f
                 .loginPage("/api/login")
                 .loginProcessingUrl("/api/login")
