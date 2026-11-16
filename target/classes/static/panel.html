@@ -54,6 +54,8 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .addcube{background:#e3e7ee;color:#1c2536;padding:8px 10px;font-size:14px}
 .werr{color:#a11;font-size:13px}
 .stalenote{font-size:13px;color:#8a5a00;background:#fff4d6;border-radius:10px;padding:10px;margin-top:10px}
+.auto{background:#f3f6fb;border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:12px}
+.auto>*+*{margin-top:10px}
 </style>
 </head>
 <body>
@@ -240,6 +242,8 @@ function windowsPanel() {
   let token = 0;
   let note = null;
   let addCount = 1;
+  let autoFrom = 8 * 60;
+  let autoTo = 17 * 60;
 
   const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
   const toMin = t => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10);
@@ -355,7 +359,7 @@ function windowsPanel() {
       }
       touch();
     };
-    const fillBtn = $('button', { className: 'small ghost', textContent: 'Hamısını 3 kubla doldur' });
+    const fillBtn = $('button', { className: 'small ghost', textContent: 'Mövcudları 3 kubla doldur' });
     fillBtn.onclick = () => {
       if (!wins.length) { toast('Əvvəl pəncərə əlavə edin', 'err'); return; }
       wins.forEach(w => { w.cubes = KINDS.slice(); });
@@ -389,9 +393,53 @@ function windowsPanel() {
       render();
     };
 
+    const unit = dur.HAIRCUT + dur.WASH + dur.BEARD;
+    const fromSel = $('select');
+    const toSel = $('select');
+    for (let m = WORK_START; m < WORK_END; m += 15) fromSel.append($('option', { value: String(m), textContent: fmt(m) }));
+    for (let m = WORK_START + 15; m <= WORK_END; m += 15) toSel.append($('option', { value: String(m), textContent: fmt(m) }));
+    fromSel.value = String(autoFrom);
+    toSel.value = String(autoTo);
+    const preview = $('p', { className: 'muted' });
+    const autoBtn = $('button', { className: 'green full', textContent: 'Bütün günü avtomatik yarat' });
+    function showPreview() {
+      const span = autoTo - autoFrom;
+      const raw = Math.floor(span / unit);
+      const n = Math.min(raw, MAX_WINDOWS);
+      if (span <= 0) {
+        preview.textContent = 'Bitmə vaxtı başlamadan sonra olmalıdır';
+      } else if (n < 1) {
+        preview.textContent = `Bu aralıq bir pəncərə üçün kifayət etmir (lazım: ${unit} dəq)`;
+      } else {
+        const left = span - n * unit;
+        preview.textContent = `Hər pəncərə ${unit} dəq (3 kub). Bu aralıqda ${n} pəncərə yaranacaq` +
+          (raw > n ? ` (ən çox ${MAX_WINDOWS})` : '') + `, ${left} dəq boş qalacaq.`;
+      }
+      autoBtn.disabled = n < 1;
+    }
+    fromSel.onchange = () => { autoFrom = parseInt(fromSel.value, 10); showPreview(); };
+    toSel.onchange = () => { autoTo = parseInt(toSel.value, 10); showPreview(); };
+    autoBtn.onclick = () => {
+      const n = Math.min(Math.floor((autoTo - autoFrom) / unit), MAX_WINDOWS);
+      if (n < 1) return;
+      if (wins.length && !confirm('Bu gündəki mövcud pəncərələr əvəz olunacaq. Davam edək?')) return;
+      wins = [];
+      for (let i = 0; i < n; i++) wins.push({ manual: i === 0, start: autoFrom, cubes: KINDS.slice() });
+      touch();
+    };
+    const autoBox = $('div', { className: 'auto' },
+      $('b', { textContent: 'Bütün günü avtomatik yarat' }),
+      $('p', { className: 'muted', textContent: 'İş saatlarını seçin, sistem aralığı pəncərələrə bölür. Hər pəncərədə 3 kub olur (saç kəsimi, saç yuma, saqqal kəsimi).' }),
+      $('div', { className: 'two' },
+        $('div', {}, $('label', { textContent: 'Başlama' }), fromSel),
+        $('div', {}, $('label', { textContent: 'Bitmə' }), toSel)),
+      preview, autoBtn);
+    showPreview();
+
     const els = [
       title,
       $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · pəncərənin uzunluğu içindəki kubların cəmidir` }),
+      autoBox,
       $('div', { className: 'wh' }, countSel, addBtn),
       $('div', { className: 'wh' }, fillBtn, clearBtn)
     ];

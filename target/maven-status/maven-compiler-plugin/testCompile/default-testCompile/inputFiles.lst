@@ -3,6 +3,7 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingApplicationTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingControllerTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/LoginTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/PanelAutoFillTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PanelPageTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PanelTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PanelUiTests.java
