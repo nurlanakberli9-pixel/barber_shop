@@ -62,6 +62,14 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .cancelled .crow{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #f0e2b6}
 .cancelled a{color:#2f6fb0}
 .cancelled button{margin-top:8px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#fff;color:#1c2536;border:1px solid #d5d9e0;border-radius:14px;padding:12px;font:inherit;text-align:left;cursor:pointer;min-height:76px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.tile .ti{font-size:22px}
+.tile b{font-size:15px}
+.tile .sub{font-size:12px;color:#667;min-height:15px}
+.tile.on{background:#3f5470;color:#fff;border-color:#3f5470}
+.tile.on .sub{color:#cfd8e6}
+.secbody .panel>h2:first-child{display:none}
 </style>
 </head>
 <body>
@@ -566,6 +574,7 @@ function bookingsPanel() {
     if (!items || !items.length) return;
     kept = kept.concat(items);
     renderCancelled();
+    if (openSectionHook) openSectionHook('bookings');
   };
 
   function row(b) {
@@ -599,6 +608,7 @@ function bookingsPanel() {
       return;
     }
     dayBookings = r.data;
+    if (setTileSub) setTileSub('bookings', r.data.length ? `${r.data.length} rezerv` : 'Boşdur');
     const d = new Date(date + 'T00:00:00');
     list.replaceChildren(
       $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · ${r.data.length} rezerv` }),
@@ -611,6 +621,9 @@ function bookingsPanel() {
   load();
   return box;
 }
+
+let setTileSub = null;
+let openSectionHook = null;
 
 function showPanel() {
   logoutBtn.hidden = false;
@@ -736,16 +749,59 @@ function showPanel() {
         : [$('p', { className: 'muted', textContent: 'Bu gün üçün saat yoxdur. Yuxarıdan yarada bilərsiniz.' })]));
   }
 
+  const subs = {};
+  setTileSub = (id, text) => { if (subs[id]) subs[id].textContent = text; };
+  const dateText = () => {
+    const d = new Date(date + 'T00:00:00');
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  };
+  dateInput.addEventListener('change', () => setTileSub('date', dateText()));
+
+  const sections = [
+    { id: 'date', icon: '📅', title: 'Gün',
+      node: $('div', { className: 'panel' }, $('label', { textContent: 'Gün seçin' }), dateInput) },
+    { id: 'bookings', icon: '📋', title: 'Rezervlər', node: bookingsPanel() },
+    { id: 'services', icon: '🧰', title: 'Xidmətlər', node: servicesPanel() },
+    { id: 'windows', icon: '🕒', title: 'İş aralıqları', node: windowsPanel() },
+    { id: 'old', icon: '🗂️', title: 'Köhnə saatlar',
+      node: $('div', { className: 'panel' },
+        $('p', { className: 'muted', textContent: 'Köhnə saatlıq rezervlər (müvəqqəti, müştəri sayı yeni modelə keçənə qədər)' }),
+        list) }
+  ];
+  const tiles = $('div', { className: 'tiles' });
+  const bodies = $('div');
+  const tileEls = {};
+  let openId = 'bookings';
+
+  function applyOpen() {
+    sections.forEach(sec => {
+      const on = openId === sec.id;
+      tileEls[sec.id].classList.toggle('on', on);
+      tileEls[sec.id].setAttribute('aria-expanded', on ? 'true' : 'false');
+      sec.wrap.hidden = !on;
+    });
+    setTileSub('windows', windowsDirty() ? '● Saxlanılmayıb' : '');
+  }
+  openSectionHook = id => { openId = id; applyOpen(); };
+
+  sections.forEach(sec => {
+    const sub = $('span', { className: 'sub' });
+    subs[sec.id] = sub;
+    const t = $('button', { type: 'button', className: 'tile' },
+      $('span', { className: 'ti', textContent: sec.icon }),
+      $('b', { textContent: sec.title }), sub);
+    t.onclick = () => { openId = openId === sec.id ? null : sec.id; applyOpen(); };
+    tileEls[sec.id] = t;
+    tiles.append(t);
+    sec.wrap = $('div', { className: 'secbody' }, sec.node);
+    bodies.append(sec.wrap);
+  });
+  setTileSub('date', dateText());
+  applyOpen();
+
   app.replaceChildren(
-    $('div', { className: 'panel' },
-      $('h2', { textContent: `${me.masterName} @ ${me.shopName}` }),
-      $('label', { textContent: 'Gün' }), dateInput),
-    bookingsPanel(),
-    servicesPanel(),
-    windowsPanel(),
-    $('div', { className: 'panel' },
-      $('p', { className: 'muted', textContent: 'Köhnə saatlıq rezervlər (müvəqqəti, müştəri sayı yeni modelə keçənə qədər)' }),
-      list));
+    $('div', { className: 'panel' }, $('h2', { textContent: `${me.masterName} @ ${me.shopName}` })),
+    tiles, bodies);
   loadDay();
 }
 
