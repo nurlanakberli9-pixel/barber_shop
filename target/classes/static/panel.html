@@ -628,15 +628,12 @@ let openSectionHook = null;
 function showPanel() {
   logoutBtn.hidden = false;
   const dateInput = $('input', { type: 'date', value: date, min: todayKey, max: maxKey });
-  const from = $('select');
-  const to = $('select');
-  for (let h = 9; h <= 20; h++) from.append($('option', { value: String(h), textContent: pad(h) + ':00' }));
-  for (let h = 10; h <= 21; h++) to.append($('option', { value: String(h), textContent: pad(h) + ':00' }));
-  from.value = '10';
-  to.value = '18';
-  const createNote = $('div');
-  const createBtn = $('button', { className: 'green full', textContent: 'Saatları yarat' });
-  const list = $('div');
+  const subs = {};
+  setTileSub = (id, text) => { if (subs[id]) subs[id].textContent = text; };
+  const dateText = () => {
+    const d = new Date(date + 'T00:00:00');
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  };
 
   dateInput.onchange = () => {
     const v = dateInput.value;
@@ -650,123 +647,17 @@ function showPanel() {
       return;
     }
     date = v;
-    loadDay();
+    setTileSub('date', dateText());
     if (reloadWindows) reloadWindows();
     if (reloadBookings) reloadBookings();
   };
-
-  createBtn.onclick = async () => {
-    createNote.className = ''; createNote.textContent = '';
-    const f = +from.value, t = +to.value;
-    if (t <= f) {
-      createNote.className = 'msg';
-      createNote.textContent = 'Bitmə saatı başlama saatından sonra olmalıdır';
-      return;
-    }
-    createBtn.disabled = true;
-    const r = await call('POST', '/api/panel/slots', { date, fromHour: f, toHour: t });
-    createBtn.disabled = false;
-    if (r.status === 401) return sessionExpired();
-    if (r.status === 200 && r.data) {
-      createNote.className = 'msg ok';
-      createNote.textContent = `${r.data.created} saat yaradıldı, ${r.data.skipped} saat atlandı (artıq var və ya vaxtı keçib)`;
-      loadDay();
-    } else {
-      createNote.className = 'msg';
-      createNote.textContent =
-        r.status === 400 ? 'Tarix və ya saat aralığı düzgün deyil' :
-        r.status === 409 ? 'Eyni anda başqa dəyişiklik oldu, yenidən cəhd edin' :
-        'Xəta baş verdi, yenidən cəhd edin';
-    }
-  };
-
-  async function deleteSlot(x, time, btn) {
-    if (!confirm(`${time} saatını silmək istəyirsiniz?`)) return;
-    btn.disabled = true;
-    const r = await call('DELETE', `/api/panel/slots/${x.id}`);
-    if (r.status === 401) return sessionExpired();
-    if (r.status === 204) toast('Saat silindi', 'ok');
-    else if (r.status === 409) toast('Dolu saatı silmək olmaz, əvvəl rezervi ləğv edin', 'err');
-    else if (r.status === 404) toast('Saat tapılmadı', 'err');
-    else toast('Xəta baş verdi', 'err');
-    loadDay();
-  }
-
-  async function cancelSlot(x, time, btn) {
-    if (!confirm(`${time} saatındakı rezervi ləğv etmək istəyirsiniz? Müştəriyə xəbər getməyəcək.`)) return;
-    btn.disabled = true;
-    const r = await call('POST', `/api/panel/slots/${x.id}/cancel`);
-    if (r.status === 401) return sessionExpired();
-    if (r.status === 204) toast('Rezerv ləğv edildi, saat yenidən boşdur', 'ok');
-    else if (r.status === 409) toast('Bu saat artıq rezerv olunmayıb', 'err');
-    else if (r.status === 404) toast('Saat tapılmadı', 'err');
-    else toast('Xəta baş verdi', 'err');
-    loadDay();
-  }
-
-  function row(x) {
-    const time = x.startTime.slice(11, 16);
-    const info = $('div', { className: 'info' });
-    const r = $('div', { className: 'row' }, $('div', { className: 'time', textContent: time }), info);
-    r.append($('span', { className: 'chip ' + x.status.toLowerCase(), textContent: LABEL[x.status] || x.status }));
-    if (x.status === 'BOOKED') {
-      info.append($('b', { textContent: x.customerName || '—' }));
-      if (x.customerPhone) {
-        info.append(/^\+?[0-9]{9,15}$/.test(x.customerPhone)
-          ? $('a', { href: 'tel:' + x.customerPhone, textContent: x.customerPhone })
-          : $('span', { textContent: x.customerPhone }));
-      }
-      const b = $('button', { className: 'small danger', textContent: 'Ləğv et' });
-      b.onclick = () => cancelSlot(x, time, b);
-      r.append(b);
-    } else if (x.status === 'FREE') {
-      const b = $('button', { className: 'small ghost', textContent: 'Sil' });
-      b.onclick = () => deleteSlot(x, time, b);
-      r.append(b);
-    }
-    return r;
-  }
-
-  async function loadDay() {
-    const token = ++dayToken;
-    list.replaceChildren($('p', { className: 'muted', textContent: 'Yüklənir...' }));
-    const r = await call('GET', `/api/panel/day?date=${date}`);
-    if (token !== dayToken) return;
-    if (r.status === 401) return sessionExpired();
-    if (r.status !== 200 || !Array.isArray(r.data)) {
-      list.replaceChildren($('div', { className: 'msg', textContent: 'Saatları yükləmək alınmadı. Yenidən cəhd edin.' }));
-      return;
-    }
-    const d = new Date(date + 'T00:00:00');
-    const free = r.data.filter(x => x.status === 'FREE').length;
-    const booked = r.data.filter(x => x.status === 'BOOKED').length;
-    list.replaceChildren(
-      $('h2', { textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]}` }),
-      $('div', { className: 'summary' },
-        $('span', { textContent: `Boş: ${free}` }), $('span', { textContent: `Dolu: ${booked}` }),
-        $('span', { textContent: `Cəmi: ${r.data.length}` })),
-      ...(r.data.length ? r.data.map(row)
-        : [$('p', { className: 'muted', textContent: 'Bu gün üçün saat yoxdur. Yuxarıdan yarada bilərsiniz.' })]));
-  }
-
-  const subs = {};
-  setTileSub = (id, text) => { if (subs[id]) subs[id].textContent = text; };
-  const dateText = () => {
-    const d = new Date(date + 'T00:00:00');
-    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  };
-  dateInput.addEventListener('change', () => setTileSub('date', dateText()));
 
   const sections = [
     { id: 'date', icon: '📅', title: 'Gün',
       node: $('div', { className: 'panel' }, $('label', { textContent: 'Gün seçin' }), dateInput) },
     { id: 'bookings', icon: '📋', title: 'Rezervlər', node: bookingsPanel() },
     { id: 'services', icon: '🧰', title: 'Xidmətlər', node: servicesPanel() },
-    { id: 'windows', icon: '🕒', title: 'İş aralıqları', node: windowsPanel() },
-    { id: 'old', icon: '🗂️', title: 'Köhnə saatlar',
-      node: $('div', { className: 'panel' },
-        $('p', { className: 'muted', textContent: 'Köhnə saatlıq rezervlər (müvəqqəti, müştəri sayı yeni modelə keçənə qədər)' }),
-        list) }
+    { id: 'windows', icon: '🕒', title: 'İş aralıqları', node: windowsPanel() }
   ];
   const tiles = $('div', { className: 'tiles' });
   const bodies = $('div');
@@ -802,7 +693,6 @@ function showPanel() {
   app.replaceChildren(
     $('div', { className: 'panel' }, $('h2', { textContent: `${me.masterName} @ ${me.shopName}` })),
     tiles, bodies);
-  loadDay();
 }
 
 logoutBtn.onclick = async () => {

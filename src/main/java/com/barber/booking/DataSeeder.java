@@ -1,8 +1,6 @@
 package com.barber.booking;
 
 import java.security.SecureRandom;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -20,14 +18,12 @@ public class DataSeeder implements CommandLineRunner {
             "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private final BarbershopRepository shops;
-    private final SlotRepository slots;
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
 
-    public DataSeeder(BarbershopRepository shops, SlotRepository slots,
-            AppUserRepository users, PasswordEncoder encoder) {
+    public DataSeeder(BarbershopRepository shops, AppUserRepository users,
+            PasswordEncoder encoder) {
         this.shops = shops;
-        this.slots = slots;
         this.users = users;
         this.encoder = encoder;
     }
@@ -46,25 +42,11 @@ public class DataSeeder implements CommandLineRunner {
             {"Sharp & Clean", "Leyla", "Neftçilər pr. 48"}
         };
         double[] ratings = {4.8, 4.7, 4.9, 4.6, 4.5, 4.4, 4.8, 4.7};
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
-        List<Slot> all = new ArrayList<>();
         List<Barbershop> created = new ArrayList<>();
         for (int i = 0; i < data.length; i++) {
-            Barbershop shop = shops.save(
-                    new Barbershop(data[i][0], data[i][1], data[i][2], ratings[i]));
-            created.add(shop);
-            for (int d = 0; d < 60; d++) {
-                for (int h = 9; h <= 20; h++) {
-                    LocalDateTime t = today.plusDays(d).atTime(h, 0);
-                    if (t.isBefore(now)) continue;
-                    Slot s = new Slot(shop, t);
-                    if ((i + d + h) % 4 == 0) s.book("Test", "+994500000000");
-                    all.add(s);
-                }
-            }
+            created.add(shops.save(
+                    new Barbershop(data[i][0], data[i][1], data[i][2], ratings[i])));
         }
-        slots.saveAll(all);
         seedBarberAccounts(created);
     }
 

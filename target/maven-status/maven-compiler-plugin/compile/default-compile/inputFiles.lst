@@ -1,4 +1,3 @@
-/workspaces/barber_shop/src/main/java/com/barber/booking/ApiExceptionHandler.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUser.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUserDetailsService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUserRepository.java
@@ -7,7 +6,6 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/BarbershopRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Booking.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingApplication.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/BookingController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingGuard.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/DataSeeder.java
@@ -15,15 +13,13 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginAttemptService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PanelBookingController.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/PanelController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PublicBookingController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceKind.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceType.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceTypeRepository.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/Slot.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/SlotRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ShopController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/WindowController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/WindowCube.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/WorkWindow.java
