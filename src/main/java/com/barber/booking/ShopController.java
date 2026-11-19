@@ -19,7 +19,7 @@ public class ShopController {
 
     @GetMapping
     public List<ShopDto> list() {
-        return shops.findAll().stream()
+        return shops.findByActiveTrueOrderById().stream()
                 .map(s -> new ShopDto(s.getId(), s.getName(), s.getMasterName(),
                         s.getAddress(), s.getRating()))
                 .toList();

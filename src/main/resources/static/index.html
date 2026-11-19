@@ -109,6 +109,7 @@ function avatar(s) {
   return a;
 }
 function stars(r) {
+  if (!(r > 0)) return 'Yeni';
   const full = Math.round(r);
   return '★'.repeat(full) + '☆'.repeat(5 - full) + ' ' + r.toFixed(1);
 }

@@ -15,6 +15,8 @@ public class Barbershop {
     private String address;
     @Column(nullable = false)
     private double rating;
+    @Column(nullable = false)
+    private boolean active = true;
 
     protected Barbershop() {}
 
@@ -30,4 +32,6 @@ public class Barbershop {
     public String getMasterName() { return masterName; }
     public String getAddress() { return address; }
     public double getRating() { return rating; }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 }

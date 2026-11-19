@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,15 +54,20 @@ public class PublicBookingController {
     private final WorkRangeRepository workRanges;
     private final BookingRepository bookings;
     private final ComboBufferRepository buffers;
+    private final ClosedDayRepository closed;
+    private final ApplicationEventPublisher events;
 
     public PublicBookingController(BarbershopRepository shops, ServiceTypeRepository types,
             WorkRangeRepository workRanges, BookingRepository bookings,
-            ComboBufferRepository buffers) {
+            ComboBufferRepository buffers, ClosedDayRepository closed,
+            ApplicationEventPublisher events) {
         this.shops = shops;
         this.types = types;
         this.workRanges = workRanges;
         this.bookings = bookings;
         this.buffers = buffers;
+        this.closed = closed;
+        this.events = events;
     }
 
     @GetMapping("/services")
@@ -87,11 +93,14 @@ public class PublicBookingController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         requireShop(shopId);
         checkDate(date);
+        int earliest = DayPlanner.earliest(date, LocalDateTime.now());
+        if (closed.existsByBarbershopIdAndClosedDate(shopId, date)) {
+            return new DayView(DayPlanner.STEP, earliest, List.of(), List.of());
+        }
         List<Span> ranges = rangesOf(shopId);
         List<Span> busy = busyOf(
                 bookings.findByBarbershopIdAndBookingDateOrderByStartMinute(shopId, date));
-        return new DayView(DayPlanner.STEP, DayPlanner.earliest(date, LocalDateTime.now()),
-                dto(ranges), dto(busy));
+        return new DayView(DayPlanner.STEP, earliest, dto(ranges), dto(busy));
     }
 
     @GetMapping("/calendar")
@@ -101,14 +110,22 @@ public class PublicBookingController {
         requireShop(shopId);
         int n = Math.min(Math.max(days, 1), 60);
         LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(n - 1);
         List<Span> ranges = rangesOf(shopId);
+        Set<LocalDate> closedDates = closed
+                .findByBarbershopIdAndClosedDateBetween(shopId, from, to).stream()
+                .map(ClosedDay::getClosedDate).collect(Collectors.toSet());
         Map<LocalDate, List<Booking>> byDate = bookings
-                .findByBarbershopIdAndBookingDateBetween(shopId, from, from.plusDays(n - 1))
+                .findByBarbershopIdAndBookingDateBetween(shopId, from, to)
                 .stream().collect(Collectors.groupingBy(Booking::getBookingDate));
         LocalDateTime now = LocalDateTime.now();
         List<DayFree> out = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             LocalDate d = from.plusDays(i);
+            if (closedDates.contains(d)) {
+                out.add(new DayFree(d, 0, 0));
+                continue;
+            }
             int earliest = DayPlanner.earliest(d, now);
             List<Span> busy = busyOf(byDate.getOrDefault(d, List.of()));
             int work = DayPlanner.sum(DayPlanner.clipFrom(ranges, earliest));
@@ -123,8 +140,14 @@ public class PublicBookingController {
     public BookingDto book(@PathVariable Long shopId, @Valid @RequestBody BookingRequest req) {
         Barbershop shop = shops.findByIdForUpdate(shopId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!shop.isActive()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         LocalDate date = req.date();
         checkDate(date);
+        if (closed.existsByBarbershopIdAndClosedDate(shopId, date)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bərbər bu gün işləmir");
+        }
         List<Choice> choices = parseChoices(req.services());
         int start = DayPlanner.parse(req.startTime());
         int end = DayPlanner.parse(req.endTime());
@@ -164,6 +187,7 @@ public class PublicBookingController {
         }
         Booking saved = bookings.save(new Booking(shop, date, start, duration, buffer, choices,
                 req.name().trim(), req.phone().trim()));
+        events.publishEvent(new BookingCreatedEvent(shopId, date, start, end));
         return new BookingDto(saved.getId(), date, DayPlanner.fmt(start), DayPlanner.fmt(end),
                 duration, choices.stream().map(c -> c.kind().name()).toList());
     }
@@ -231,7 +255,7 @@ public class PublicBookingController {
     }
 
     private void requireShop(Long shopId) {
-        if (!shops.existsById(shopId)) {
+        if (!shops.existsByIdAndActiveTrue(shopId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
     }

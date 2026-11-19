@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>BarberConnect · Admin</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#eef0f4;color:#1c2536}
+header{background:#fff;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px}
+header .brand{font-size:19px;font-weight:700}
+header .tag{background:#7b4fc0;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px}
+header button{margin-left:auto}
+main{max-width:640px;margin:0 auto;padding:16px}
+.panel{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.panel h2{margin:0 0 10px;font-size:17px}
+.muted{color:#667;font-size:14px}
+input{width:100%;font:inherit;padding:12px;border:1px solid #ccd;border-radius:10px;background:#fff}
+label{display:block;font-size:13px;color:#667;margin:10px 0 4px}
+button{font:inherit;border-radius:10px;border:0;padding:12px 16px;cursor:pointer;background:#3f5470;color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button.green{background:#22a845}
+button.small{padding:8px 12px;font-size:14px}
+button.danger{background:#a32020}
+button.ghost{background:#e3e7ee;color:#1c2536}
+.full{width:100%;margin-top:14px}
+.msg{padding:12px;border-radius:10px;margin-top:12px;background:#fde2e2;color:#a11}
+.msg.ok{background:#d9f5e0;color:#146c2e}
+.row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #eceef2;flex-wrap:wrap}
+.row:last-child{border-bottom:0}
+.info{flex:1;min-width:150px;font-size:14px}
+.info b,.info span{display:block}
+.off{opacity:.6}
+.pwrow{display:flex;gap:8px}
+.pwrow input{flex:1}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
+.toast.ok{background:#1b8a39}
+.toast.err{background:#a32020}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">✂ BarberConnect</span>
+  <span class="tag">Admin</span>
+  <button id="logout" class="ghost small" hidden>Çıxış</button>
+</header>
+<main id="app"></main>
+<script>
+const app = document.getElementById('app');
+const logoutBtn = document.getElementById('logout');
+const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
+const ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function toast(text, type) {
+  const t = $('div', { className: 'toast ' + type, textContent: text });
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function csrf() {
+  try { await fetch('/api/csrf'); } catch (e) { return ''; }
+  const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+async function call(method, url, body) {
+  const headers = {};
+  const init = { method, headers };
+  if (method !== 'GET') headers['X-XSRF-TOKEN'] = await csrf();
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  try {
+    const r = await fetch(url, init);
+    const text = await r.text();
+    let data = null;
+    if (text) { try { data = JSON.parse(text); } catch (e) {} }
+    return { status: r.status, data };
+  } catch (e) {
+    return { status: 0, data: null };
+  }
+}
+
+function randomPassword() {
+  const bytes = new Uint32Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, n => ALPHABET[n % ALPHABET.length]).join('');
+}
+
+function showLogin(message, ok) {
+  logoutBtn.hidden = true;
+  const user = $('input', { type: 'text', autocomplete: 'username', autocapitalize: 'none', spellcheck: false, maxLength: 64 });
+  const pass = $('input', { type: 'password', autocomplete: 'current-password', maxLength: 128 });
+  const note = $('div');
+  if (message) { note.className = 'msg' + (ok ? ' ok' : ''); note.textContent = message; }
+  const btn = $('button', { className: 'green full', type: 'submit', textContent: 'Daxil ol' });
+  const form = $('form', {},
+    $('label', { textContent: 'İstifadəçi adı' }), user,
+    $('label', { textContent: 'Parol' }), pass, btn, note);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    btn.disabled = true;
+    note.className = ''; note.textContent = '';
+    let status = 0;
+    try {
+      const token = await csrf();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'X-XSRF-TOKEN': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: user.value.trim(), password: pass.value })
+      });
+      status = r.status;
+    } catch (err) { status = 0; }
+    pass.value = '';
+    if (status === 200) { boot(); return; }
+    btn.disabled = false;
+    note.className = 'msg';
+    note.textContent =
+      status === 401 ? 'İstifadəçi adı və ya parol səhvdir' :
+      status === 429 ? 'Çox sayda səhv cəhd oldu. 15 dəqiqə sonra yenidən cəhd edin' :
+      'Xəta baş verdi, yenidən cəhd edin';
+  };
+  app.replaceChildren($('div', { className: 'panel' }, $('h2', { textContent: 'Admin girişi' }), form));
+}
+
+function showAdmin(me) {
+  logoutBtn.hidden = false;
+  const username = $('input', { type: 'text', autocapitalize: 'none', spellcheck: false, maxLength: 32, placeholder: 'məs. leyla' });
+  const password = $('input', { type: 'text', autocomplete: 'off', maxLength: 72, placeholder: 'ən azı 10 simvol' });
+  const gen = $('button', { type: 'button', className: 'ghost', textContent: 'Təsadüfi' });
+  gen.onclick = () => { password.value = randomPassword(); };
+  const shopName = $('input', { type: 'text', maxLength: 80 });
+  const masterName = $('input', { type: 'text', maxLength: 60 });
+  const address = $('input', { type: 'text', maxLength: 120 });
+  const note = $('div');
+  const create = $('button', { type: 'button', className: 'green full', textContent: 'Bərbər hesabı yarat' });
+  const list = $('div');
+
+  create.onclick = async () => {
+    note.className = ''; note.textContent = '';
+    const bad = m => { note.className = 'msg'; note.textContent = m; };
+    const u = username.value.trim();
+    if (!/^[a-z0-9._-]{3,32}$/.test(u)) return bad('İstifadəçi adı: 3-32 simvol, yalnız kiçik latın hərfləri, rəqəm, nöqtə, tire');
+    if (password.value.length < 10 || new TextEncoder().encode(password.value).length > 72) return bad('Parol 10-72 simvol olmalıdır');
+    if (!shopName.value.trim() || !masterName.value.trim() || !address.value.trim()) return bad('Salon, usta və ünvan yazılmalıdır');
+    create.disabled = true;
+    const r = await call('POST', '/api/admin/barbers', {
+      username: u, password: password.value,
+      shopName: shopName.value.trim(), masterName: masterName.value.trim(), address: address.value.trim()
+    });
+    create.disabled = false;
+    if (r.status === 401) return showLogin('Sessiya bitdi, yenidən daxil olun');
+    if (r.status === 200) {
+      note.className = 'msg ok';
+      note.textContent = `Hesab yaradıldı: ${u}. Parolu bərbərə təhlükəsiz ötürün, o, paneldə dəyişə bilər.`;
+      [username, password, shopName, masterName, address].forEach(i => { i.value = ''; });
+      loadList();
+    } else if (r.status === 409) bad('Bu istifadəçi adı artıq var');
+    else if (r.status === 400) bad('Məlumatlar düzgün deyil');
+    else bad('Xəta baş verdi, yenidən cəhd edin');
+  };
+
+  function row(b) {
+    const reset = $('button', { type: 'button', className: 'small ghost', textContent: 'Parol' });
+    reset.onclick = async () => {
+      const p = prompt(`${b.username} üçün yeni parol (10-72 simvol):`);
+      if (p === null) return;
+      if (p.length < 10 || new TextEncoder().encode(p).length > 72) { toast('Parol 10-72 simvol olmalıdır', 'err'); return; }
+      const r = await call('POST', `/api/admin/barbers/${b.id}/password`, { password: p });
+      if (r.status === 401) return showLogin('Sessiya bitdi, yenidən daxil olun');
+      toast(r.status === 204 ? 'Parol dəyişdirildi' : 'Xəta baş verdi', r.status === 204 ? 'ok' : 'err');
+    };
+    const toggle = $('button', { type: 'button', className: 'small ' + (b.enabled ? 'danger' : 'green'), textContent: b.enabled ? 'Deaktiv et' : 'Aktiv et' });
+    toggle.onclick = async () => {
+      if (b.enabled && !confirm(`${b.username} deaktiv edilsin? Daxil ola bilməyəcək və saytda görünməyəcək.`)) return;
+      const r = await call('POST', `/api/admin/barbers/${b.id}/enabled`, { enabled: !b.enabled });
+      if (r.status === 401) return showLogin('Sessiya bitdi, yenidən daxil olun');
+      toast(r.status === 204 ? 'Yadda saxlanıldı' : 'Xəta baş verdi', r.status === 204 ? 'ok' : 'err');
+      loadList();
+    };
+    return $('div', { className: 'row' + (b.enabled ? '' : ' off') },
+      $('div', { className: 'info' },
+        $('b', { textContent: `${b.masterName} @ ${b.shopName}` }),
+        $('span', { className: 'muted', textContent: `${b.username} · ${b.enabled ? 'aktiv' : 'deaktiv'}` })),
+      reset, toggle);
+  }
+
+  async function loadList() {
+    const r = await call('GET', '/api/admin/barbers');
+    if (r.status === 401) return showLogin('Sessiya bitdi, yenidən daxil olun');
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      list.replaceChildren($('div', { className: 'msg', textContent: 'Siyahını yükləmək alınmadı.' }));
+      return;
+    }
+    list.replaceChildren(...(r.data.length ? r.data.map(row) : [$('p', { className: 'muted', textContent: 'Bərbər yoxdur.' })]));
+  }
+
+  app.replaceChildren(
+    $('div', { className: 'panel' },
+      $('h2', { textContent: 'Yeni bərbər' }),
+      $('p', { className: 'muted', textContent: `Daxil olmusunuz: ${me.username}` }),
+      $('label', { textContent: 'İstifadəçi adı' }), username,
+      $('label', { textContent: 'İlkin parol' }), $('div', { className: 'pwrow' }, password, gen),
+      $('label', { textContent: 'Salonun adı' }), shopName,
+      $('label', { textContent: 'Ustanın adı' }), masterName,
+      $('label', { textContent: 'Ünvan' }), address,
+      create, note),
+    $('div', { className: 'panel' }, $('h2', { textContent: 'Bərbərlər' }), list));
+  loadList();
+}
+
+logoutBtn.onclick = async () => {
+  logoutBtn.disabled = true;
+  await call('POST', '/api/logout');
+  logoutBtn.disabled = false;
+  showLogin('Çıxış edildi', true);
+};
+
+async function boot() {
+  const r = await call('GET', '/api/admin/me');
+  if (r.status === 200 && r.data) showAdmin(r.data);
+  else if (r.status === 401) showLogin();
+  else if (r.status === 403) {
+    logoutBtn.hidden = false;
+    app.replaceChildren($('div', { className: 'msg', textContent: 'Bu hesab admin deyil. Çıxış edib admin hesabı ilə daxil olun.' }));
+  } else app.replaceChildren($('div', { className: 'msg', textContent: 'Serverə qoşulmaq alınmadı. Səhifəni yeniləyin.' }));
+}
+boot();
+</script>
+</body>
+</html>

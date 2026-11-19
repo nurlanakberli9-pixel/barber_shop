@@ -14,6 +14,8 @@ public class AppUser {
     private String passwordHash;
     @Column(nullable = false)
     private String role;
+    @Column(nullable = false)
+    private boolean enabled = true;
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "barbershop_id", unique = true)
     private Barbershop barbershop;
@@ -31,5 +33,9 @@ public class AppUser {
     public String getUsername() { return username; }
     public String getPasswordHash() { return passwordHash; }
     public String getRole() { return role; }
+    public boolean isEnabled() { return enabled; }
     public Barbershop getBarbershop() { return barbershop; }
+
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 }

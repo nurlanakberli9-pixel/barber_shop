@@ -25,11 +25,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/panel.html",
-                        "/favicon.ico", "/api/csrf").permitAll()
+                        "/admin.html", "/sw.js", "/favicon.ico", "/api/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/shops/*/bookings", "/api/login",
                         "/api/logout").permitAll()
                 .requestMatchers("/api/panel/**").hasRole("BARBER")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().denyAll())
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())

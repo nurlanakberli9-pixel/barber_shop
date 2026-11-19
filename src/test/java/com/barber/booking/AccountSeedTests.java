@@ -17,12 +17,12 @@ class AccountSeedTests {
 
     @Test
     void everyBarbershopHasOneAccountWithHashedPassword() {
-        var all = users.findAll();
-        assertEquals(8, all.size());
-        for (AppUser u : all) {
+        var barbers = users.findAll().stream().filter(u -> "BARBER".equals(u.getRole())).toList();
+        assertEquals(8, barbers.size());
+        for (AppUser u : barbers) {
             assertTrue(u.getPasswordHash().startsWith("$2"), "BCrypt hash olmalıdır");
             assertFalse(encoder.matches("password", u.getPasswordHash()));
-            assertEquals("BARBER", u.getRole());
+            assertTrue(u.isEnabled());
         }
     }
 
