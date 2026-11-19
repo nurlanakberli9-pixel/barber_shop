@@ -6,10 +6,16 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/BarbershopRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Booking.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingApplication.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/BookingGuard.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/BufferController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/Choice.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ComboBuffer.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ComboBufferRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/Combos.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/DataSeeder.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/DayPlanner.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/HoursController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/Level.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginAttemptService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PanelBookingController.java
@@ -20,7 +26,5 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceType.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceTypeRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ShopController.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/WindowController.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/WindowCube.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/WorkWindow.java
-/workspaces/barber_shop/src/main/java/com/barber/booking/WorkWindowRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WorkRange.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/WorkRangeRepository.java

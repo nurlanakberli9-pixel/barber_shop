@@ -34,34 +34,6 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .info{flex:1;min-width:0;font-size:14px}
 .info b,.info a,.info span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .info a{color:#2f6fb0}
-.chip{font-size:12px;border-radius:8px;padding:4px 8px;color:#fff;white-space:nowrap}
-.chip.free{background:#22a845}
-.chip.booked{background:#a32020}
-.chip.past{background:#aab0bb}
-.summary{display:flex;gap:14px;font-size:14px;margin-bottom:6px;flex-wrap:wrap}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
-.toast.ok{background:#1b8a39}
-.toast.err{background:#a32020}
-.win{border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:12px}
-.win>*+*{margin-top:10px}
-.wh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.wh+.wh{margin-top:10px}
-.wh label{margin:0}
-.wh select{width:auto;min-width:96px}
-.cubes{display:flex;flex-wrap:wrap;gap:8px}
-.cube{display:flex;align-items:center;gap:4px;background:#3f5470;color:#fff;border-radius:10px;padding:4px 4px 4px 10px;font-size:14px}
-.cube button{background:none;color:#fff;padding:0;min-width:34px;min-height:34px;font-size:16px}
-.addcube{background:#e3e7ee;color:#1c2536;padding:8px 10px;font-size:14px}
-.werr{color:#a11;font-size:13px}
-.stalenote{font-size:13px;color:#8a5a00;background:#fff4d6;border-radius:10px;padding:10px;margin-top:10px}
-.auto{background:#f3f6fb;border:1px solid #d5d9e0;border-radius:12px;padding:12px;margin-top:12px}
-.auto>*+*{margin-top:10px}
-.selbox{display:flex;align-items:center;gap:8px;color:#1c2536;font-size:15px}
-.selbox input{width:22px;height:22px;padding:0;margin:0}
-.cancelled{background:#fff4d6;border-radius:12px;padding:12px;margin-bottom:10px;font-size:14px}
-.cancelled .crow{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #f0e2b6}
-.cancelled a{color:#2f6fb0}
-.cancelled button{margin-top:8px}
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
 .tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#fff;color:#1c2536;border:1px solid #d5d9e0;border-radius:14px;padding:12px;font:inherit;text-align:left;cursor:pointer;min-height:76px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .tile .ti{font-size:22px}
@@ -70,6 +42,20 @@ button.ghost{background:#e3e7ee;color:#1c2536}
 .tile.on{background:#3f5470;color:#fff;border-color:#3f5470}
 .tile.on .sub{color:#cfd8e6}
 .secbody .panel>h2:first-child{display:none}
+.cancelled{background:#fff4d6;border-radius:12px;padding:12px;margin-bottom:10px;font-size:14px}
+.cancelled .crow{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #f0e2b6}
+.cancelled a{color:#2f6fb0}
+.cancelled button{margin-top:8px}
+.hrow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-top:8px}
+.grp{font-weight:700;margin:16px 0 4px}
+.q{font-size:14px;margin-top:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 18px;border-radius:12px;color:#fff;z-index:30;max-width:90%;text-align:center}
+.toast.ok{background:#1b8a39}
+.toast.err{background:#a32020}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eceef2}
+.stepper{display:flex;align-items:center;gap:6px}
+.step{padding:8px 10px;min-width:46px}
+.sval{min-width:64px;text-align:center}
 </style>
 </head>
 <body>
@@ -84,14 +70,17 @@ const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
 const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
-const LABEL = { FREE: 'Boş', BOOKED: 'Dolu', PAST: 'Keçmiş' };
 const pad = n => String(n).padStart(2, '0');
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+const toMin = t => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10);
 const todayKey = iso(new Date());
 const maxKey = iso(new Date(Date.now() + 59 * 864e5));
 let me = null;
 let date = todayKey;
-let dayToken = 0;
+let setTileSub = null;
+let openSectionHook = null;
+let reloadBookings = null;
 
 function toast(text, type) {
   const t = $('div', { className: 'toast ' + type, textContent: text });
@@ -162,387 +151,7 @@ function showLogin(message, ok) {
   app.replaceChildren($('div', { className: 'panel' }, $('h2', { textContent: 'Bərbər girişi' }), form));
 }
 
-function sessionExpired() {
-  showLogin('Sessiya bitdi, yenidən daxil olun');
-}
-
-function servicesPanel() {
-  const box = $('div', { className: 'panel' });
-  const title = $('h2', { textContent: 'Xidmətlərim' });
-  const inputs = {};
-  const note = $('div');
-  const sum = $('p', { className: 'muted' });
-  const save = $('button', { className: 'green full', textContent: 'Müddətləri saxla' });
-
-  function updateSum() {
-    const v = Object.values(inputs).map(i => parseInt(i.value, 10));
-    sum.textContent = v.length && v.every(n => n > 0)
-      ? `Minimum iş aralığı: ${v.reduce((a, b) => a + b, 0)} dəqiqə (üç xidmətin cəmi)`
-      : 'Minimum iş aralığı üçün üç xidmətin müddətini yazın';
-  }
-
-  function fill(data) {
-    Object.keys(inputs).forEach(k => delete inputs[k]);
-    const rows = data.services.map(s => {
-      const inp = $('input', {
-        type: 'number', inputMode: 'numeric', min: '5', max: '240', step: '5',
-        placeholder: 'dəqiqə', value: s.durationMinutes == null ? '' : String(s.durationMinutes)
-      });
-      inp.oninput = updateSum;
-      inputs[s.code] = inp;
-      return $('div', {}, $('label', { textContent: `${s.name} (dəqiqə)` }), inp);
-    });
-    box.replaceChildren(title,
-      $('p', { className: 'muted', textContent: 'Hər xidmətin nə qədər vaxt apardığını yazın.' }),
-      ...rows, sum, save, note);
-    updateSum();
-  }
-
-  async function load() {
-    box.replaceChildren(title, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
-    const r = await call('GET', '/api/panel/services');
-    if (r.status === 401) return sessionExpired();
-    if (r.status === 200 && r.data) fill(r.data);
-    else box.replaceChildren(title, $('div', { className: 'msg', textContent: 'Xidmətləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
-  }
-
-  save.onclick = async () => {
-    note.className = ''; note.textContent = '';
-    const services = Object.entries(inputs).map(([code, i]) => ({ code, durationMinutes: parseInt(i.value, 10) }));
-    const bad = services.some(s => !(s.durationMinutes >= 5 && s.durationMinutes <= 240 && s.durationMinutes % 5 === 0));
-    if (bad) {
-      note.className = 'msg';
-      note.textContent = 'Hər müddət 5 ilə 240 dəqiqə arasında və 5-in qatı olmalıdır';
-      return;
-    }
-    save.disabled = true;
-    const r = await call('PUT', '/api/panel/services', { services });
-    save.disabled = false;
-    if (r.status === 401) return sessionExpired();
-    if (r.status === 200 && r.data) {
-      fill(r.data);
-      note.className = 'msg ok';
-      note.textContent = 'Saxlanıldı';
-      if (refreshDurations) refreshDurations();
-    } else {
-      note.className = 'msg';
-      note.textContent = r.status === 400
-        ? 'Müddətlər düzgün deyil (5-240 dəqiqə, 5-in qatı)'
-        : 'Xəta baş verdi, yenidən cəhd edin';
-    }
-  };
-
-  load();
-  return box;
-}
-
-let reloadWindows = null;
-let refreshDurations = null;
-let windowsDirty = () => false;
-
-function windowsPanel() {
-  const KINDS = ['HAIRCUT', 'WASH', 'BEARD'];
-  const NAMES = { HAIRCUT: 'Saç kəsimi', WASH: 'Saç yuma', BEARD: 'Saqqal kəsimi' };
-  const ICONS = { HAIRCUT: '✂️', WASH: '🚿', BEARD: '🧔' };
-  const MAX_WINDOWS = 20;
-  const WORK_START = 8 * 60;
-  const WORK_END = 22 * 60;
-  const box = $('div', { className: 'panel' });
-  const title = $('h2', { textContent: 'İş aralıqları' });
-  let dur = null;
-  let wins = [];
-  let dirty = false;
-  let stale = false;
-  let token = 0;
-  let note = null;
-  let addCount = 1;
-  let autoFrom = 8 * 60;
-  let autoTo = 17 * 60;
-
-  const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
-  const toMin = t => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10);
-
-  function setDurations(data) {
-    const m = {};
-    let ok = true;
-    data.services.forEach(x => { if (x.durationMinutes == null) ok = false; else m[x.code] = x.durationMinutes; });
-    dur = ok && KINDS.every(k => m[k] > 0) ? m : null;
-  }
-
-  function fromServer(list) {
-    wins = [];
-    stale = false;
-    let prevEnd = null;
-    list.forEach(x => {
-      const start = toMin(x.startTime);
-      if (dur && x.cubes.some(c => c.minutes !== dur[c.code])) stale = true;
-      wins.push({ manual: prevEnd === null || start !== prevEnd, start, cubes: x.cubes.map(c => c.code) });
-      prevEnd = start + x.totalMinutes;
-    });
-  }
-
-  function layout() {
-    let prevEnd = null;
-    return wins.map(w => {
-      const total = w.cubes.reduce((a, c) => a + dur[c], 0);
-      const start = (w.manual || prevEnd === null) ? w.start : prevEnd;
-      const end = start + total;
-      let err = '';
-      if (total === 0) err = 'Pəncərədə ən azı bir kub olmalıdır';
-      else if (start < WORK_START || end > WORK_END) err = 'Pəncərə 08:00-22:00 aralığından çıxır';
-      else if (prevEnd !== null && start < prevEnd) err = 'Əvvəlki pəncərə ilə üst-üstə düşür';
-      prevEnd = end;
-      return { start, end, total, err };
-    });
-  }
-
-  function touch() { dirty = true; note = null; render(); }
-
-  function removeWindows(pred) {
-    const info = layout();
-    let removed = false;
-    const keep = [];
-    wins.forEach((w, i) => {
-      if (pred(w, i)) { removed = true; return; }
-      if (removed) { w.start = info[i].start; w.manual = true; }
-      keep.push(w);
-    });
-    wins = keep;
-  }
-
-  function card(w, i, x) {
-    const chk = $('input', { type: 'checkbox', checked: !!w.sel, ariaLabel: 'Seç' });
-    chk.onchange = () => { w.sel = chk.checked; };
-    const head = $('div', { className: 'wh' },
-      $('label', { className: 'selbox' }, chk, $('b', { textContent: `Pəncərə ${i + 1}` })),
-      $('span', { className: 'muted', textContent: `${fmt(x.start)} – ${fmt(x.end)} · ${x.total} dəq` }));
-
-    const startRow = $('div', { className: 'wh' });
-    if (i === 0 || w.manual) {
-      const sel = $('select');
-      const opts = [];
-      for (let m = WORK_START; m < WORK_END; m += 15) opts.push(m);
-      if (!opts.includes(x.start)) { opts.push(x.start); opts.sort((a, b) => a - b); }
-      opts.forEach(m => sel.append($('option', { value: String(m), textContent: fmt(m) })));
-      sel.value = String(x.start);
-      sel.onchange = () => { w.start = parseInt(sel.value, 10); w.manual = true; touch(); };
-      startRow.append($('label', { textContent: 'Başlama' }), sel);
-      if (i > 0) {
-        const b = $('button', { className: 'small ghost', textContent: 'Ardıcıl et' });
-        b.onclick = () => { w.manual = false; touch(); };
-        startRow.append(b);
-      }
-    } else {
-      startRow.append($('span', { className: 'muted', textContent: 'Əvvəlki pəncərənin ardınca' }));
-      const b = $('button', { className: 'small ghost', textContent: 'Vaxtı seç' });
-      b.onclick = () => { w.manual = true; w.start = x.start; touch(); };
-      startRow.append(b);
-    }
-
-    const cubes = $('div', { className: 'cubes' });
-    w.cubes.forEach(code => {
-      const rm = $('button', { textContent: '✕', ariaLabel: 'Kubu sil' });
-      rm.onclick = () => { w.cubes = w.cubes.filter(c => c !== code); touch(); };
-      cubes.append($('span', { className: 'cube' },
-        $('span', { textContent: `${ICONS[code]} ${NAMES[code]} · ${dur[code]} dəq` }), rm));
-    });
-    KINDS.filter(k => !w.cubes.includes(k)).forEach(k => {
-      const b = $('button', { className: 'addcube', textContent: `+ ${NAMES[k]} (${dur[k]})` });
-      b.onclick = () => {
-        w.cubes.push(k);
-        w.cubes.sort((a, c) => KINDS.indexOf(a) - KINDS.indexOf(c));
-        touch();
-      };
-      cubes.append(b);
-    });
-
-    const del = $('button', { className: 'small ghost', textContent: 'Pəncərəni sil' });
-    del.onclick = () => { removeWindows((x, j) => j === i); touch(); };
-
-    const el = $('div', { className: 'win' }, head, startRow, cubes, del);
-    if (x.err) el.append($('div', { className: 'werr', textContent: x.err }));
-    return el;
-  }
-
-  function render() {
-    if (!dur) {
-      box.replaceChildren(title, $('div', { className: 'msg', textContent: 'Əvvəl yuxarıdakı Xidmətlərim bölməsində üç xidmətin müddətini yazıb saxlayın.' }));
-      return;
-    }
-    const info = layout();
-    const hasErr = info.some(x => x.err);
-    const d = new Date(date + 'T00:00:00');
-
-    const countSel = $('select');
-    for (let n = 1; n <= 10; n++) countSel.append($('option', { value: String(n), textContent: String(n) }));
-    countSel.value = String(addCount);
-    countSel.style.width = '80px';
-    countSel.onchange = () => { addCount = parseInt(countSel.value, 10); };
-    const addBtn = $('button', { className: 'small ghost', textContent: 'Pəncərə əlavə et' });
-    addBtn.onclick = () => {
-      const room = MAX_WINDOWS - wins.length;
-      if (room <= 0) { toast('Bir günə ən çox 20 pəncərə olar', 'err'); return; }
-      for (let n = 0; n < Math.min(addCount, room); n++) {
-        wins.push({ manual: wins.length === 0, start: 10 * 60, cubes: [] });
-      }
-      touch();
-    };
-    const fillBtn = $('button', { className: 'small ghost', textContent: 'Mövcudları 3 kubla doldur' });
-    fillBtn.onclick = () => {
-      if (!wins.length) { toast('Əvvəl pəncərə əlavə edin', 'err'); return; }
-      wins.forEach(w => { w.cubes = KINDS.slice(); });
-      touch();
-    };
-    const clearBtn = $('button', { className: 'small ghost', textContent: 'Hamısını sil' });
-    clearBtn.onclick = () => {
-      if (wins.length && confirm('Bütün pəncərələr silinsin? Saxlamayana qədər serverdə dəyişmir.')) { wins = []; touch(); }
-    };
-    const delSel = $('button', { className: 'small ghost', textContent: 'Seçilənləri sil' });
-    delSel.onclick = () => {
-      if (!wins.some(w => w.sel)) { toast('Əvvəl silinəcək pəncərələri seçin', 'err'); return; }
-      removeWindows(w => w.sel);
-      touch();
-    };
-    const saveBtn = $('button', { className: 'green full', textContent: 'Yadda saxla' });
-    saveBtn.disabled = !dirty || hasErr;
-    saveBtn.onclick = async () => {
-      saveBtn.disabled = true;
-      const saveDate = date;
-      const payload = { windows: wins.map((w, i) => ({ startTime: fmt(info[i].start), cubes: w.cubes })) };
-      const sortedSpans = info.map(x => [x.start, x.end]).sort((a, b) => a[0] - b[0]);
-      const mergedSpans = [];
-      sortedSpans.forEach(([a, b]) => {
-        const last = mergedSpans[mergedSpans.length - 1];
-        if (last && a <= last[1]) last[1] = Math.max(last[1], b); else mergedSpans.push([a, b]);
-      });
-      const stranded = dayBookings.filter(b => {
-        const bs = toMin(b.start), be = toMin(b.end);
-        return !mergedSpans.some(m => m[0] <= bs && be <= m[1]);
-      });
-      if (stranded.length) {
-        const lines = stranded.map(b => `${b.start}–${b.end}  ${b.customerName}  ${b.customerPhone}`).join('\n');
-        if (!confirm(`Bu dəyişiklik ${stranded.length} rezervi ləğv edəcək:\n\n${lines}\n\nMüştərilərə xəbər getməyəcək, özünüz zəng edin. Davam edək?`)) {
-          saveBtn.disabled = false;
-          return;
-        }
-      }
-      const cancelQuery = stranded.length ? '&cancelBookingIds=' + stranded.map(b => b.id).join(',') : '';
-      const r = await call('PUT', `/api/panel/windows?date=${saveDate}${cancelQuery}`, payload);
-      if (r.status === 401) return sessionExpired();
-      if (r.status === 200 && Array.isArray(r.data)) {
-        if (date !== saveDate) { toast('Saxlanıldı', 'ok'); load(); return; }
-        fromServer(r.data);
-        dirty = false;
-        note = { ok: true, text: 'Saxlanıldı' };
-        if (stranded.length && showCancelled) showCancelled(stranded);
-        if (reloadBookings) reloadBookings();
-      } else {
-        note = {
-          ok: false,
-          text: r.status === 409 ? (reloadBookings && reloadBookings(), 'Pəncərələr saxlanmadı: xidmət müddətləri yazılmayıb və ya yeni rezerv gəlib. Rezervlər yeniləndi, yenidən cəhd edin')
-            : r.status === 400 ? 'Pəncərələr düzgün deyil (vaxt aralığı və ya üst-üstə düşmə)'
-            : 'Xəta baş verdi, yenidən cəhd edin'
-        };
-      }
-      render();
-    };
-
-    const unit = dur.HAIRCUT + dur.WASH + dur.BEARD;
-    const fromSel = $('select');
-    const toSel = $('select');
-    for (let m = WORK_START; m < WORK_END; m += 15) fromSel.append($('option', { value: String(m), textContent: fmt(m) }));
-    for (let m = WORK_START + 15; m <= WORK_END; m += 15) toSel.append($('option', { value: String(m), textContent: fmt(m) }));
-    fromSel.value = String(autoFrom);
-    toSel.value = String(autoTo);
-    const preview = $('p', { className: 'muted' });
-    const autoBtn = $('button', { className: 'green full', textContent: 'Bütün günü avtomatik yarat' });
-    function showPreview() {
-      const span = autoTo - autoFrom;
-      const raw = Math.floor(span / unit);
-      const n = Math.min(raw, MAX_WINDOWS);
-      if (span <= 0) {
-        preview.textContent = 'Bitmə vaxtı başlamadan sonra olmalıdır';
-      } else if (n < 1) {
-        preview.textContent = `Bu aralıq bir pəncərə üçün kifayət etmir (lazım: ${unit} dəq)`;
-      } else {
-        const left = span - n * unit;
-        preview.textContent = `Hər pəncərə ${unit} dəq (3 kub). Bu aralıqda ${n} pəncərə yaranacaq` +
-          (raw > n ? ` (ən çox ${MAX_WINDOWS})` : '') + `, ${left} dəq boş qalacaq.`;
-      }
-      autoBtn.disabled = n < 1;
-    }
-    fromSel.onchange = () => { autoFrom = parseInt(fromSel.value, 10); showPreview(); };
-    toSel.onchange = () => { autoTo = parseInt(toSel.value, 10); showPreview(); };
-    autoBtn.onclick = () => {
-      const n = Math.min(Math.floor((autoTo - autoFrom) / unit), MAX_WINDOWS);
-      if (n < 1) return;
-      if (wins.length && !confirm('Bu gündəki mövcud pəncərələr əvəz olunacaq. Davam edək?')) return;
-      wins = [];
-      for (let i = 0; i < n; i++) wins.push({ manual: i === 0, start: autoFrom, cubes: KINDS.slice() });
-      touch();
-    };
-    const autoBox = $('div', { className: 'auto' },
-      $('b', { textContent: 'Bütün günü avtomatik yarat' }),
-      $('p', { className: 'muted', textContent: 'İş saatlarını seçin, sistem aralığı pəncərələrə bölür. Hər pəncərədə 3 kub olur (saç kəsimi, saç yuma, saqqal kəsimi).' }),
-      $('div', { className: 'two' },
-        $('div', {}, $('label', { textContent: 'Başlama' }), fromSel),
-        $('div', {}, $('label', { textContent: 'Bitmə' }), toSel)),
-      preview, autoBtn);
-    showPreview();
-
-    const els = [
-      title,
-      $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · pəncərənin uzunluğu içindəki kubların cəmidir` }),
-      autoBox,
-      $('div', { className: 'wh' }, countSel, addBtn),
-      $('div', { className: 'wh' }, fillBtn, clearBtn, delSel)
-    ];
-    if (wins.length) wins.forEach((w, i) => els.push(card(w, i, info[i])));
-    else els.push($('p', { className: 'muted', textContent: 'Bu gün üçün iş aralığı yoxdur. Yuxarıdan pəncərə əlavə edin.' }));
-    if (stale) els.push($('div', { className: 'stalenote', textContent: 'Xidmət müddətləri dəyişib. Saxlayanda pəncərələr yeni müddətlərlə hesablanacaq.' }));
-    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
-    els.push(saveBtn);
-    box.replaceChildren(...els);
-  }
-
-  async function load() {
-    const t = ++token;
-    box.replaceChildren(title, $('p', { className: 'muted', textContent: 'Yüklənir...' }));
-    const [sv, wr] = await Promise.all([
-      call('GET', '/api/panel/services'),
-      call('GET', `/api/panel/windows?date=${date}`)
-    ]);
-    if (t !== token) return;
-    if (sv.status === 401 || wr.status === 401) return sessionExpired();
-    if (sv.status !== 200 || wr.status !== 200 || !sv.data || !Array.isArray(wr.data)) {
-      box.replaceChildren(title, $('div', { className: 'msg', textContent: 'İş aralıqlarını yükləmək alınmadı. Səhifəni yeniləyin.' }));
-      return;
-    }
-    setDurations(sv.data);
-    fromServer(wr.data);
-    dirty = false;
-    note = null;
-    render();
-  }
-
-  reloadWindows = load;
-  windowsDirty = () => dirty;
-  refreshDurations = async () => {
-    const r = await call('GET', '/api/panel/services');
-    if (r.status !== 200 || !r.data) return;
-    const before = JSON.stringify(dur);
-    setDurations(r.data);
-    if (before !== JSON.stringify(dur) && wins.length) { stale = true; dirty = true; }
-    render();
-  };
-
-  load();
-  return box;
-}
-
-let dayBookings = [];
-let reloadBookings = null;
-let showCancelled = null;
+function sessionExpired() { showLogin('Sessiya bitdi, yenidən daxil olun'); }
 
 function phoneNode(p) {
   return /^\+?[0-9]{9,15}$/.test(p)
@@ -570,13 +179,6 @@ function bookingsPanel() {
     cancelledBox.replaceChildren(wrap);
   }
 
-  showCancelled = items => {
-    if (!items || !items.length) return;
-    kept = kept.concat(items);
-    renderCancelled();
-    if (openSectionHook) openSectionHook('bookings');
-  };
-
   function row(b) {
     const info = $('div', { className: 'info' }, $('b', { textContent: b.customerName }));
     info.append(phoneNode(b.customerPhone));
@@ -587,13 +189,12 @@ function bookingsPanel() {
       cancel.disabled = true;
       const r = await call('POST', `/api/panel/bookings/${b.id}/cancel`);
       if (r.status === 401) return sessionExpired();
-      if (r.status === 204) { showCancelled([b]); toast('Rezerv ləğv edildi', 'ok'); }
+      if (r.status === 204) { kept.push(b); renderCancelled(); toast('Rezerv ləğv edildi', 'ok'); }
       else if (r.status === 404) toast('Bu rezerv artıq yoxdur', 'err');
       else toast('Xəta baş verdi', 'err');
       load();
     };
-    return $('div', { className: 'row' },
-      $('div', { className: 'time', textContent: b.start }), info, cancel);
+    return $('div', { className: 'row' }, $('div', { className: 'time', textContent: b.start }), info, cancel);
   }
 
   async function load() {
@@ -603,11 +204,9 @@ function bookingsPanel() {
     if (t !== token) return;
     if (r.status === 401) return sessionExpired();
     if (r.status !== 200 || !Array.isArray(r.data)) {
-      dayBookings = [];
       list.replaceChildren($('div', { className: 'msg', textContent: 'Rezervləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
       return;
     }
-    dayBookings = r.data;
     if (setTileSub) setTileSub('bookings', r.data.length ? `${r.data.length} rezerv` : 'Boşdur');
     const d = new Date(date + 'T00:00:00');
     list.replaceChildren(
@@ -622,8 +221,245 @@ function bookingsPanel() {
   return box;
 }
 
-let setTileSub = null;
-let openSectionHook = null;
+function hoursPanel() {
+  const box = $('div', { className: 'panel' });
+  let rows = [];
+  let note = null;
+  let loaded = false;
+
+  function select(from, to, value, onchange) {
+    const sel = $('select');
+    const vals = [];
+    for (let m = from; m <= to; m += 15) vals.push(m);
+    if (!vals.includes(value)) { vals.push(value); vals.sort((a, b) => a - b); }
+    vals.forEach(m => sel.append($('option', { value: String(m), textContent: fmt(m) })));
+    sel.value = String(value);
+    sel.onchange = () => onchange(parseInt(sel.value, 10));
+    return sel;
+  }
+
+  function summary() {
+    return rows.map(r => `${fmt(r.start)}–${fmt(r.end)}`).join(', ');
+  }
+
+  function render() {
+    const list = rows.map((r, i) => {
+      const rm = $('button', { className: 'small ghost', textContent: '✕', ariaLabel: 'Aralığı sil' });
+      rm.onclick = () => { rows.splice(i, 1); note = null; render(); };
+      return $('div', { className: 'hrow' },
+        $('div', {}, $('label', { textContent: 'Başlama' }), select(300, 1425, r.start, v => { r.start = v; })),
+        $('div', {}, $('label', { textContent: 'Bitmə' }), select(315, 1435, r.end, v => { r.end = v; })),
+        rm);
+    });
+    const add = $('button', { className: 'small ghost', textContent: '+ Aralıq əlavə et' });
+    add.onclick = () => {
+      if (rows.length >= 6) { toast('Ən çox 6 aralıq ola bilər', 'err'); return; }
+      const last = rows.length ? rows[rows.length - 1].end : 480;
+      const s = Math.min(last + 60, 1380);
+      rows.push({ start: s, end: Math.min(s + 120, 1425) });
+      note = null;
+      render();
+    };
+    const save = $('button', { className: 'green full', textContent: 'Yadda saxla' });
+    save.onclick = async () => {
+      if (!rows.length) { note = { ok: false, text: 'Ən azı bir iş aralığı olmalıdır' }; render(); return; }
+      if (rows.some(r => r.end <= r.start)) { note = { ok: false, text: 'Bitmə vaxtı başlamadan sonra olmalıdır' }; render(); return; }
+      save.disabled = true;
+      const r = await call('PUT', '/api/panel/hours', { ranges: rows.map(x => ({ start: fmt(x.start), end: fmt(x.end) })) });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && Array.isArray(r.data)) {
+        rows = r.data.map(x => ({ start: toMin(x.start), end: toMin(x.end) }));
+        loaded = true;
+        note = { ok: true, text: 'Saxlanıldı. Hər gün üçün bu saatlar tətbiq olunur.' };
+        if (setTileSub) setTileSub('hours', summary());
+      } else {
+        note = { ok: false, text: r.status === 409 ? 'Mövcud rezervlər yeni iş saatlarından kənarda qalır. Əvvəl onları ləğv edin.'
+          : r.status === 400 ? 'Saat aralıqları düzgün deyil' : 'Xəta baş verdi, yenidən cəhd edin' };
+      }
+      render();
+    };
+    const els = [
+      $('h2', { textContent: 'İş saatları' }),
+      $('p', { className: 'muted', textContent: 'Hər gün üçün eyni saatlar tətbiq olunur. Aradakı vaxtda bərbər yoxdur. Toxunan aralıqlar birləşir.' })
+    ];
+    if (!loaded) els.push($('p', { className: 'muted', textContent: 'Saatlar hələ saxlanılmayıb. Düzəldib saxlayın.' }));
+    els.push(...list, $('div', { style: 'margin-top:10px' }, add), save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'İş saatları' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/hours');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      box.replaceChildren($('h2', { textContent: 'İş saatları' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    loaded = r.data.length > 0;
+    rows = loaded ? r.data.map(x => ({ start: toMin(x.start), end: toMin(x.end) })) : [{ start: 480, end: 1020 }];
+    if (setTileSub) setTileSub('hours', loaded ? summary() : 'Qurulmayıb');
+    render();
+  }
+
+  load();
+  return box;
+}
+
+function servicesPanel() {
+  const box = $('div', { className: 'panel' });
+  const ORDER = ['low', 'medium', 'high'];
+  let meta = [];
+  let state = {};
+  let note = null;
+
+  function init(list) {
+    meta = list;
+    state = {};
+    list.forEach(s => {
+      state[s.code] = s.levels
+        ? { low: s.low || 5, medium: s.medium || 5, high: s.high || 5 }
+        : { minutes: s.minutes || 5 };
+    });
+  }
+
+  function normalize(o, key) {
+    const i = ORDER.indexOf(key);
+    for (let j = i + 1; j < 3; j++) if (o[ORDER[j]] < o[key]) o[ORDER[j]] = o[key];
+    for (let j = i - 1; j >= 0; j--) if (o[ORDER[j]] > o[key]) o[ORDER[j]] = o[key];
+  }
+
+  function stepper(o, key, isLevel) {
+    const minus = $('button', { type: 'button', className: 'small ghost step', textContent: '−5', ariaLabel: '5 dəqiqə azalt' });
+    const plus = $('button', { type: 'button', className: 'small ghost step', textContent: '+5', ariaLabel: '5 dəqiqə artır' });
+    const val = $('b', { className: 'sval', textContent: o[key] + ' dəq' });
+    minus.disabled = o[key] <= 5;
+    plus.disabled = o[key] >= 240;
+    const change = d => {
+      o[key] = Math.min(240, Math.max(5, o[key] + d));
+      if (isLevel) normalize(o, key);
+      note = null;
+      render();
+    };
+    minus.onclick = () => change(-5);
+    plus.onclick = () => change(5);
+    return $('div', { className: 'stepper' }, minus, val, plus);
+  }
+
+  function render() {
+    const els = [
+      $('h2', { textContent: 'Xidmətlər' }),
+      $('p', { className: 'muted', textContent: 'Hər xidmətin müddətini 5 dəqiqəlik addımlarla təyin edin (ən azı 5 dəq). Saç və saqqal üçün az, orta və çox variantı ayrıca yazılır.' })
+    ];
+    meta.forEach(s => {
+      els.push($('div', { className: 'grp', textContent: s.name }));
+      const o = state[s.code];
+      if (s.levels) {
+        const noun = s.code === 'BEARD' ? 'saqqalı' : 'saçı';
+        [['low', 'Az'], ['medium', 'Orta'], ['high', 'Çox']].forEach(([k, word]) => {
+          els.push($('div', { className: 'srow' }, $('span', { textContent: `${word} ${noun} olan` }), stepper(o, k, true)));
+        });
+      } else {
+        els.push($('div', { className: 'srow' }, $('span', { textContent: 'Müddət' }), stepper(o, 'minutes', false)));
+      }
+    });
+    const save = $('button', { className: 'green full', textContent: 'Müddətləri saxla' });
+    save.onclick = async () => {
+      save.disabled = true;
+      const services = meta.map(s => s.levels
+        ? { code: s.code, low: state[s.code].low, medium: state[s.code].medium, high: state[s.code].high }
+        : { code: s.code, minutes: state[s.code].minutes });
+      const r = await call('PUT', '/api/panel/services', { services });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && r.data) {
+        init(r.data.services);
+        note = { ok: true, text: 'Saxlanıldı. Müştərilər bu müddətlərlə rezerv edəcək.' };
+        if (setTileSub) setTileSub('services', 'Yazılıb');
+      } else {
+        note = { ok: false, text: r.status === 400 ? 'Müddətlər düzgün deyil' : 'Xəta baş verdi, yenidən cəhd edin' };
+      }
+      render();
+    };
+    els.push(save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'Xidmətlər' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/services');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !r.data) {
+      box.replaceChildren($('h2', { textContent: 'Xidmətlər' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    const ready = r.data.services.every(s => s.levels ? (s.low != null && s.medium != null && s.high != null) : s.minutes != null);
+    if (setTileSub) setTileSub('services', ready ? 'Yazılıb' : 'Yazılmayıb');
+    init(r.data.services);
+    render();
+  }
+
+  load();
+  return box;
+}
+
+function buffersPanel() {
+  const box = $('div', { className: 'panel' });
+  const OPTS = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120];
+  let note = null;
+
+  function fill(list) {
+    const selects = [];
+    const titles = { 1: 'Tək xidmət', 2: 'İkili kombinasiya', 3: 'Üçlü kombinasiya' };
+    const els = [
+      $('h2', { textContent: 'Ardıcıl qaydalar' }),
+      $('p', { className: 'muted', textContent: 'Müştəri xidməti seçib bitirəndən sonra növbəti rezerv nə vaxt başlaya bilər? "Dərhal" seçsəniz, növbəti rezerv elə həmin dəqiqədən başlaya bilər.' })
+    ];
+    let lastSize = 0;
+    list.forEach(b => {
+      if (b.services.length !== lastSize) {
+        lastSize = b.services.length;
+        els.push($('div', { className: 'grp', textContent: titles[lastSize] }));
+      }
+      const sel = $('select');
+      const vals = OPTS.includes(b.afterMinutes) ? OPTS : OPTS.concat([b.afterMinutes]).sort((x, y) => x - y);
+      vals.forEach(v => sel.append($('option', { value: String(v), textContent: v === 0 ? 'Dərhal' : `${v} dəq sonra` })));
+      sel.value = String(b.afterMinutes);
+      selects.push({ services: b.services, sel });
+      els.push($('div', { className: 'q', textContent: `${b.label} rezerv olunsa, növbəti rezerv:` }), sel);
+    });
+    const save = $('button', { className: 'green full', textContent: 'Qaydaları saxla' });
+    save.onclick = async () => {
+      save.disabled = true;
+      const r = await call('PUT', '/api/panel/buffers', { buffers: selects.map(x => ({ services: x.services, afterMinutes: parseInt(x.sel.value, 10) })) });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && Array.isArray(r.data)) {
+        note = { ok: true, text: 'Saxlanıldı. Yeni rezervlərə tətbiq olunur.' };
+        fill(r.data);
+      } else {
+        note = { ok: false, text: 'Xəta baş verdi, yenidən cəhd edin' };
+        fill(list);
+      }
+    };
+    els.push(save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'Ardıcıl qaydalar' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/buffers');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      box.replaceChildren($('h2', { textContent: 'Ardıcıl qaydalar' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    fill(r.data);
+  }
+
+  load();
+  return box;
+}
 
 function showPanel() {
   logoutBtn.hidden = false;
@@ -634,7 +470,6 @@ function showPanel() {
     const d = new Date(date + 'T00:00:00');
     return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
   };
-
   dateInput.onchange = () => {
     const v = dateInput.value;
     if (!v || v < todayKey || v > maxKey) {
@@ -642,22 +477,18 @@ function showPanel() {
       dateInput.value = date;
       return;
     }
-    if (windowsDirty() && !confirm('Saxlanılmamış pəncərə dəyişiklikləri var. Gün dəyişsin?')) {
-      dateInput.value = date;
-      return;
-    }
     date = v;
     setTileSub('date', dateText());
-    if (reloadWindows) reloadWindows();
     if (reloadBookings) reloadBookings();
   };
 
   const sections = [
     { id: 'date', icon: '📅', title: 'Gün',
-      node: $('div', { className: 'panel' }, $('label', { textContent: 'Gün seçin' }), dateInput) },
+      node: $('div', { className: 'panel' }, $('label', { textContent: 'Rezervlərə baxmaq üçün gün seçin' }), dateInput) },
     { id: 'bookings', icon: '📋', title: 'Rezervlər', node: bookingsPanel() },
+    { id: 'hours', icon: '🕒', title: 'İş saatları', node: hoursPanel() },
     { id: 'services', icon: '🧰', title: 'Xidmətlər', node: servicesPanel() },
-    { id: 'windows', icon: '🕒', title: 'İş aralıqları', node: windowsPanel() }
+    { id: 'buffers', icon: '⏱️', title: 'Ardıcıl qaydalar', node: buffersPanel() }
   ];
   const tiles = $('div', { className: 'tiles' });
   const bodies = $('div');
@@ -671,7 +502,6 @@ function showPanel() {
       tileEls[sec.id].setAttribute('aria-expanded', on ? 'true' : 'false');
       sec.wrap.hidden = !on;
     });
-    setTileSub('windows', windowsDirty() ? '● Saxlanılmayıb' : '');
   }
   openSectionHook = id => { openId = id; applyOpen(); };
 

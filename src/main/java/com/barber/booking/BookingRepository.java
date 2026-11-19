@@ -12,5 +12,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByBarbershopIdAndBookingDateBetween(
             Long barbershopId, LocalDate from, LocalDate to);
 
+    List<Booking> findByBarbershopIdAndBookingDateGreaterThanEqual(
+            Long barbershopId, LocalDate from);
+
     Optional<Booking> findByIdAndBarbershopId(Long id, Long barbershopId);
 }

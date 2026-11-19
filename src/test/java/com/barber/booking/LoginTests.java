@@ -102,7 +102,7 @@ class LoginTests {
 
     @Test
     void bookingNeedsNoCsrfToken() throws Exception {
-        mvc.perform(post("/api/shops/1/windows/1/bookings").contentType("application/json")
+        mvc.perform(post("/api/shops/1/bookings").contentType("application/json")
                 .content("{\"name\":\"\",\"phone\":\"1\"}"))
                 .andExpect(status().isBadRequest());
     }

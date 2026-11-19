@@ -49,8 +49,10 @@ public class PanelBookingController {
                 .stream()
                 .map(b -> new BookingRow(b.getId(), DayPlanner.fmt(b.getStartMinute()),
                         DayPlanner.fmt(b.getEndMinute()), b.getDurationMinutes(),
-                        b.getKinds().stream()
-                                .map(k -> new ServiceRef(k.name(), k.getLabel())).toList(),
+                        b.getChoices().stream().map(c -> new ServiceRef(c.kind().name(),
+                                c.level() == null ? c.kind().getLabel()
+                                        : c.kind().getLabel() + " (" + c.level().label(c.kind()) + ")"))
+                                .toList(),
                         b.getCustomerName(), b.getCustomerPhone()))
                 .toList();
     }

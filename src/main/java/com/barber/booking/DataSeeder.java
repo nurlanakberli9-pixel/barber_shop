@@ -19,12 +19,17 @@ public class DataSeeder implements CommandLineRunner {
 
     private final BarbershopRepository shops;
     private final AppUserRepository users;
+    private final ServiceTypeRepository types;
+    private final WorkRangeRepository workRanges;
     private final PasswordEncoder encoder;
 
     public DataSeeder(BarbershopRepository shops, AppUserRepository users,
+            ServiceTypeRepository types, WorkRangeRepository workRanges,
             PasswordEncoder encoder) {
         this.shops = shops;
         this.users = users;
+        this.types = types;
+        this.workRanges = workRanges;
         this.encoder = encoder;
     }
 
@@ -44,8 +49,18 @@ public class DataSeeder implements CommandLineRunner {
         double[] ratings = {4.8, 4.7, 4.9, 4.6, 4.5, 4.4, 4.8, 4.7};
         List<Barbershop> created = new ArrayList<>();
         for (int i = 0; i < data.length; i++) {
-            created.add(shops.save(
-                    new Barbershop(data[i][0], data[i][1], data[i][2], ratings[i])));
+            Barbershop shop = shops.save(
+                    new Barbershop(data[i][0], data[i][1], data[i][2], ratings[i]));
+            created.add(shop);
+            for (ServiceKind k : ServiceKind.values()) {
+                ServiceType t = new ServiceType(shop, k);
+                if (k == ServiceKind.HAIRCUT) t.setLevels(15, 20, 25);
+                else if (k == ServiceKind.BEARD) t.setLevels(10, 15, 20);
+                else t.setSingle(10);
+                types.save(t);
+            }
+            workRanges.save(new WorkRange(shop, 8 * 60, 12 * 60));
+            workRanges.save(new WorkRange(shop, 14 * 60, 18 * 60));
         }
         seedBarberAccounts(created);
     }

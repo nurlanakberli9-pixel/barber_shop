@@ -15,7 +15,10 @@ public class ServiceType {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ServiceKind kind;
-    private Integer durationMinutes;
+    private Integer singleMinutes;
+    private Integer lowMinutes;
+    private Integer mediumMinutes;
+    private Integer highMinutes;
 
     protected ServiceType() {}
 
@@ -27,6 +30,28 @@ public class ServiceType {
     public Long getId() { return id; }
     public Barbershop getBarbershop() { return barbershop; }
     public ServiceKind getKind() { return kind; }
-    public Integer getDurationMinutes() { return durationMinutes; }
-    public void setDurationMinutes(Integer durationMinutes) { this.durationMinutes = durationMinutes; }
+    public Integer getSingleMinutes() { return singleMinutes; }
+    public Integer getLowMinutes() { return lowMinutes; }
+    public Integer getMediumMinutes() { return mediumMinutes; }
+    public Integer getHighMinutes() { return highMinutes; }
+
+    public void setSingle(Integer minutes) {
+        this.singleMinutes = minutes;
+    }
+
+    public void setLevels(Integer low, Integer medium, Integer high) {
+        this.lowMinutes = low;
+        this.mediumMinutes = medium;
+        this.highMinutes = high;
+    }
+
+    public Integer minutesFor(Level level) {
+        if (!kind.hasLevels()) return singleMinutes;
+        if (level == null) return null;
+        return switch (level) {
+            case LOW -> lowMinutes;
+            case MEDIUM -> mediumMinutes;
+            case HIGH -> highMinutes;
+        };
+    }
 }

@@ -23,7 +23,9 @@ public class Booking {
     private int startMinute;
     @Column(name = "duration_minutes", nullable = false)
     private int durationMinutes;
-    @Column(nullable = false, length = 64)
+    @Column(name = "buffer_minutes", nullable = false)
+    private int bufferMinutes;
+    @Column(nullable = false, length = 96)
     private String services;
     @Column(name = "customer_name", nullable = false, length = 60)
     private String customerName;
@@ -35,13 +37,14 @@ public class Booking {
     protected Booking() {}
 
     public Booking(Barbershop barbershop, LocalDate bookingDate, int startMinute,
-            int durationMinutes, List<ServiceKind> kinds, String customerName,
-            String customerPhone) {
+            int durationMinutes, int bufferMinutes, List<Choice> choices,
+            String customerName, String customerPhone) {
         this.barbershop = barbershop;
         this.bookingDate = bookingDate;
         this.startMinute = startMinute;
         this.durationMinutes = durationMinutes;
-        this.services = kinds.stream().map(Enum::name).collect(Collectors.joining(","));
+        this.bufferMinutes = bufferMinutes;
+        this.services = choices.stream().map(Choice::token).collect(Collectors.joining(","));
         this.customerName = customerName;
         this.customerPhone = customerPhone;
         this.createdAt = LocalDateTime.now();
@@ -52,12 +55,14 @@ public class Booking {
     public LocalDate getBookingDate() { return bookingDate; }
     public int getStartMinute() { return startMinute; }
     public int getDurationMinutes() { return durationMinutes; }
+    public int getBufferMinutes() { return bufferMinutes; }
     public int getEndMinute() { return startMinute + durationMinutes; }
+    public int getOccupiedEnd() { return startMinute + durationMinutes + bufferMinutes; }
     public String getCustomerName() { return customerName; }
     public String getCustomerPhone() { return customerPhone; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
-    public List<ServiceKind> getKinds() {
-        return Arrays.stream(services.split(",")).map(ServiceKind::valueOf).toList();
+    public List<Choice> getChoices() {
+        return Arrays.stream(services.split(",")).map(Choice::parse).toList();
     }
 }

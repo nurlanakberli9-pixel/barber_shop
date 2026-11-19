@@ -32,67 +32,66 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/shops/{shopId}")
 public class PublicBookingController {
 
-    record CubeDto(String code, String name, int minutes) {}
-    record WindowView(Long id, String start, String end, int totalMinutes,
-            int freeMinutes, int fitMinutes, List<CubeDto> cubes) {}
-    record GapDto(String start, String end, int minutes) {}
-    record DayFree(LocalDate date, int windowMinutes, int freeMinutes) {}
+    record ServiceInfo(String code, String name, boolean levels, Integer minutes,
+            Integer low, Integer medium, Integer high) {}
+    record SpanDto(int start, int end) {}
+    record DayView(int step, int earliest, List<SpanDto> ranges, List<SpanDto> busy) {}
+    record DayFree(LocalDate date, int workMinutes, int freeMinutes) {}
+    record ServiceChoice(@NotBlank String code, String level) {}
     record BookingRequest(
-            @NotNull @Size(min = 1, max = 3) List<@NotBlank String> services,
+            @NotNull LocalDate date,
+            @NotBlank @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d$") String startTime,
+            @NotBlank @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d$") String endTime,
+            @NotNull @Size(min = 1, max = 3) List<@NotNull @Valid ServiceChoice> services,
             @NotBlank @Size(max = 60) String name,
             @NotBlank @Pattern(regexp = "^\\+?[0-9]{9,15}$") String phone) {}
     record BookingDto(Long id, LocalDate date, String start, String end, int minutes,
             List<String> services) {}
 
     private final BarbershopRepository shops;
-    private final WorkWindowRepository windows;
+    private final ServiceTypeRepository types;
+    private final WorkRangeRepository workRanges;
     private final BookingRepository bookings;
+    private final ComboBufferRepository buffers;
 
-    public PublicBookingController(BarbershopRepository shops, WorkWindowRepository windows,
-            BookingRepository bookings) {
+    public PublicBookingController(BarbershopRepository shops, ServiceTypeRepository types,
+            WorkRangeRepository workRanges, BookingRepository bookings,
+            ComboBufferRepository buffers) {
         this.shops = shops;
-        this.windows = windows;
+        this.types = types;
+        this.workRanges = workRanges;
         this.bookings = bookings;
+        this.buffers = buffers;
     }
 
-    @GetMapping("/windows")
+    @GetMapping("/services")
     @Transactional(readOnly = true)
-    public List<WindowView> listWindows(@PathVariable Long shopId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    public List<ServiceInfo> services(@PathVariable Long shopId) {
         requireShop(shopId);
-        checkDate(date);
-        LocalDateTime now = LocalDateTime.now();
-        List<Span> booked = bookedOf(
-                bookings.findByBarbershopIdAndBookingDateOrderByStartMinute(shopId, date));
-        List<WindowView> out = new ArrayList<>();
-        for (WorkWindow w : windows.findByBarbershopIdAndWindowDateOrderByStartTime(shopId, date)) {
-            int s = DayPlanner.minutes(w.getStartTime());
-            int e = s + w.totalMinutes();
-            List<Span> free = DayPlanner.clipPast(
-                    DayPlanner.freeGaps(List.of(new Span(s, e)), booked), date, now);
-            List<CubeDto> cubes = w.getCubes().stream()
-                    .map(c -> new CubeDto(c.getKind().name(), c.getKind().getLabel(), c.getMinutes()))
-                    .toList();
-            out.add(new WindowView(w.getId(), DayPlanner.fmt(s), DayPlanner.fmt(e),
-                    w.totalMinutes(), DayPlanner.sum(free), DayPlanner.fitMinutes(free), cubes));
+        Map<ServiceKind, ServiceType> m = typesOf(shopId);
+        List<ServiceInfo> out = new ArrayList<>();
+        for (ServiceKind k : ServiceKind.values()) {
+            ServiceType t = m.get(k);
+            out.add(new ServiceInfo(k.name(), k.getLabel(), k.hasLevels(),
+                    t == null ? null : t.getSingleMinutes(),
+                    t == null ? null : t.getLowMinutes(),
+                    t == null ? null : t.getMediumMinutes(),
+                    t == null ? null : t.getHighMinutes()));
         }
         return out;
     }
 
-    @GetMapping("/gaps")
+    @GetMapping("/day")
     @Transactional(readOnly = true)
-    public List<GapDto> gaps(@PathVariable Long shopId,
+    public DayView day(@PathVariable Long shopId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         requireShop(shopId);
         checkDate(date);
-        List<Span> segments = segmentsOf(
-                windows.findByBarbershopIdAndWindowDateOrderByStartTime(shopId, date));
-        List<Span> booked = bookedOf(
+        List<Span> ranges = rangesOf(shopId);
+        List<Span> busy = busyOf(
                 bookings.findByBarbershopIdAndBookingDateOrderByStartMinute(shopId, date));
-        return DayPlanner.clipPast(DayPlanner.freeGaps(segments, booked), date, LocalDateTime.now())
-                .stream()
-                .map(g -> new GapDto(DayPlanner.fmt(g.start()), DayPlanner.fmt(g.end()), g.minutes()))
-                .toList();
+        return new DayView(DayPlanner.STEP, DayPlanner.earliest(date, LocalDateTime.now()),
+                dto(ranges), dto(busy));
     }
 
     @GetMapping("/calendar")
@@ -102,92 +101,126 @@ public class PublicBookingController {
         requireShop(shopId);
         int n = Math.min(Math.max(days, 1), 60);
         LocalDate from = LocalDate.now();
-        LocalDate to = from.plusDays(n - 1);
-        Map<LocalDate, List<WorkWindow>> ws = windows
-                .findByBarbershopIdAndWindowDateBetweenOrderByWindowDateAscStartTimeAsc(
-                        shopId, from, to)
-                .stream().collect(Collectors.groupingBy(WorkWindow::getWindowDate));
-        Map<LocalDate, List<Booking>> bs = bookings
-                .findByBarbershopIdAndBookingDateBetween(shopId, from, to)
+        List<Span> ranges = rangesOf(shopId);
+        Map<LocalDate, List<Booking>> byDate = bookings
+                .findByBarbershopIdAndBookingDateBetween(shopId, from, from.plusDays(n - 1))
                 .stream().collect(Collectors.groupingBy(Booking::getBookingDate));
         LocalDateTime now = LocalDateTime.now();
         List<DayFree> out = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             LocalDate d = from.plusDays(i);
-            List<Span> segments = segmentsOf(ws.getOrDefault(d, List.of()));
-            List<Span> booked = bookedOf(bs.getOrDefault(d, List.of()));
-            List<Span> free = DayPlanner.clipPast(DayPlanner.freeGaps(segments, booked), d, now);
-            out.add(new DayFree(d, DayPlanner.sum(segments), DayPlanner.sum(free)));
+            int earliest = DayPlanner.earliest(d, now);
+            List<Span> busy = busyOf(byDate.getOrDefault(d, List.of()));
+            int work = DayPlanner.sum(DayPlanner.clipFrom(ranges, earliest));
+            int free = DayPlanner.sum(DayPlanner.clipFrom(DayPlanner.freeGaps(ranges, busy), earliest));
+            out.add(new DayFree(d, work, free));
         }
         return out;
     }
 
-    @PostMapping("/windows/{windowId}/bookings")
+    @PostMapping("/bookings")
     @Transactional
-    public BookingDto book(@PathVariable Long shopId, @PathVariable Long windowId,
-            @Valid @RequestBody BookingRequest req) {
+    public BookingDto book(@PathVariable Long shopId, @Valid @RequestBody BookingRequest req) {
         Barbershop shop = shops.findByIdForUpdate(shopId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        WorkWindow w = windows.findByIdAndBarbershopId(windowId, shopId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        LocalDate date = w.getWindowDate();
-        if (date.isBefore(LocalDate.now())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu pəncərənin vaxtı keçib");
+        LocalDate date = req.date();
+        checkDate(date);
+        List<Choice> choices = parseChoices(req.services());
+        int start = DayPlanner.parse(req.startTime());
+        int end = DayPlanner.parse(req.endTime());
+        if (start % DayPlanner.STEP != 0 || end % DayPlanner.STEP != 0 || end <= start) {
+            throw bad("Vaxt 5 dəqiqənin qatı olmalıdır və bitmə başlamadan sonra gəlməlidir");
         }
-        Set<ServiceKind> kinds = parseKinds(req.services());
-        Map<ServiceKind, Integer> cubeMinutes = new EnumMap<>(ServiceKind.class);
-        w.getCubes().forEach(c -> cubeMinutes.put(c.getKind(), c.getMinutes()));
-        int total = 0;
-        for (ServiceKind k : kinds) {
-            Integer m = cubeMinutes.get(k);
-            if (m == null) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Bu pəncərədə seçilmiş xidmət yoxdur");
-            }
-            total += m;
-        }
-        int ws = DayPlanner.minutes(w.getStartTime());
-        int we = ws + w.totalMinutes();
-        List<Span> booked = bookedOf(
-                bookings.findByBarbershopIdAndBookingDateOrderByStartMinute(shopId, date));
-        List<Span> free = DayPlanner.clipPast(
-                DayPlanner.freeGaps(List.of(new Span(ws, we)), booked), date, LocalDateTime.now());
-        Integer start = DayPlanner.earliestFit(free, total);
-        if (start == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Bu pəncərədə seçilən xidmətlər üçün kifayət qədər boş vaxt yoxdur");
-        }
-        List<ServiceKind> ordered = new ArrayList<>(kinds);
-        Booking saved = bookings.save(new Booking(shop, date, start, total, ordered,
-                req.name().trim(), req.phone().trim()));
-        return new BookingDto(saved.getId(), date, DayPlanner.fmt(saved.getStartMinute()),
-                DayPlanner.fmt(saved.getEndMinute()), saved.getDurationMinutes(),
-                ordered.stream().map(Enum::name).toList());
-    }
-
-    private static List<Span> segmentsOf(List<WorkWindow> ws) {
-        return DayPlanner.merge(ws.stream().map(w -> {
-            int s = DayPlanner.minutes(w.getStartTime());
-            return new Span(s, s + w.totalMinutes());
-        }).toList());
-    }
-
-    private static List<Span> bookedOf(List<Booking> bs) {
-        return bs.stream().map(b -> new Span(b.getStartMinute(), b.getEndMinute())).toList();
-    }
-
-    private static Set<ServiceKind> parseKinds(List<String> codes) {
+        Map<ServiceKind, ServiceType> m = typesOf(shopId);
+        int duration = 0;
         Set<ServiceKind> kinds = EnumSet.noneOf(ServiceKind.class);
-        for (String c : codes) {
-            ServiceKind k;
+        for (Choice c : choices) {
+            ServiceType t = m.get(c.kind());
+            Integer minutes = t == null ? null : t.minutesFor(c.level());
+            if (minutes == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Bərbər hələ bu xidmətin müddətini yazmayıb");
+            }
+            duration += minutes;
+            kinds.add(c.kind());
+        }
+        if (end - start != duration) {
+            throw bad("Seçilən vaxt " + duration + " dəqiqə olmalıdır");
+        }
+        if (!DayPlanner.covered(rangesOf(shopId), start, end)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Seçilən vaxt bərbərin iş saatından kənardadır");
+        }
+        if (start < DayPlanner.earliest(date, LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu vaxt keçib");
+        }
+        int buffer = bufferFor(shopId, kinds);
+        int occupiedEnd = end + buffer;
+        for (Booking b : bookings.findByBarbershopIdAndBookingDateOrderByStartMinute(shopId, date)) {
+            if (start < b.getOccupiedEnd() && b.getStartMinute() < occupiedEnd) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Bu vaxt artıq tutulub və ya uyğun deyil");
+            }
+        }
+        Booking saved = bookings.save(new Booking(shop, date, start, duration, buffer, choices,
+                req.name().trim(), req.phone().trim()));
+        return new BookingDto(saved.getId(), date, DayPlanner.fmt(start), DayPlanner.fmt(end),
+                duration, choices.stream().map(c -> c.kind().name()).toList());
+    }
+
+    private int bufferFor(Long shopId, Set<ServiceKind> kinds) {
+        String key = Combos.key(kinds);
+        for (ComboBuffer b : buffers.findByBarbershopId(shopId)) {
+            if (b.getComboKey().equals(key)) return b.getAfterMinutes();
+        }
+        return 0;
+    }
+
+    private Map<ServiceKind, ServiceType> typesOf(Long shopId) {
+        Map<ServiceKind, ServiceType> m = new EnumMap<>(ServiceKind.class);
+        for (ServiceType t : types.findByBarbershopIdOrderById(shopId)) m.put(t.getKind(), t);
+        return m;
+    }
+
+    private List<Span> rangesOf(Long shopId) {
+        return DayPlanner.merge(workRanges.findByBarbershopIdOrderByStartMinute(shopId).stream()
+                .map(r -> new Span(r.getStartMinute(), r.getEndMinute())).toList());
+    }
+
+    private static List<Span> busyOf(List<Booking> list) {
+        return DayPlanner.merge(list.stream()
+                .map(b -> new Span(b.getStartMinute(), b.getOccupiedEnd())).toList());
+    }
+
+    private static List<SpanDto> dto(List<Span> spans) {
+        return spans.stream().map(s -> new SpanDto(s.start(), s.end())).toList();
+    }
+
+    private static List<Choice> parseChoices(List<ServiceChoice> list) {
+        List<Choice> out = new ArrayList<>();
+        Set<ServiceKind> seen = EnumSet.noneOf(ServiceKind.class);
+        for (ServiceChoice sc : list) {
+            ServiceKind kind;
             try {
-                k = ServiceKind.valueOf(c.trim().toUpperCase(Locale.ROOT));
+                kind = ServiceKind.valueOf(sc.code().trim().toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 throw bad("Naməlum xidmət");
             }
-            if (!kinds.add(k)) throw bad("Eyni xidmət təkrarlanıb");
+            if (!seen.add(kind)) throw bad("Eyni xidmət təkrarlanıb");
+            Level level = null;
+            if (kind.hasLevels()) {
+                if (sc.level() == null) {
+                    throw bad("Saç və saqqal üçün az, orta və ya çox seçilməlidir");
+                }
+                try {
+                    level = Level.valueOf(sc.level().trim().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException e) {
+                    throw bad("Naməlum səviyyə");
+                }
+            }
+            out.add(new Choice(kind, level));
         }
-        return kinds;
+        return out;
     }
 
     private static void checkDate(LocalDate date) {

@@ -10,7 +10,7 @@ import java.util.Locale;
 
 final class DayPlanner {
 
-    static final int ALIGN = 5;
+    static final int STEP = 5;
 
     record Span(int start, int end) {
         int minutes() { return end - start; }
@@ -22,12 +22,23 @@ final class DayPlanner {
         return t.getHour() * 60 + t.getMinute();
     }
 
+    static int parse(String hhmm) {
+        return Integer.parseInt(hhmm.substring(0, 2)) * 60 + Integer.parseInt(hhmm.substring(3, 5));
+    }
+
     static String fmt(int m) {
         return String.format(Locale.ROOT, "%02d:%02d", m / 60, m % 60);
     }
 
     static int alignUp(int m) {
-        return (m + ALIGN - 1) / ALIGN * ALIGN;
+        return (m + STEP - 1) / STEP * STEP;
+    }
+
+    static int earliest(LocalDate date, LocalDateTime now) {
+        LocalDate today = now.toLocalDate();
+        if (date.isAfter(today)) return 0;
+        if (date.isBefore(today)) return 24 * 60;
+        return alignUp(now.getHour() * 60 + now.getMinute() + 1);
     }
 
     static List<Span> merge(List<Span> spans) {
@@ -53,8 +64,8 @@ final class DayPlanner {
         return false;
     }
 
-    static List<Span> freeGaps(List<Span> segments, List<Span> booked) {
-        List<Span> b = merge(booked);
+    static List<Span> freeGaps(List<Span> segments, List<Span> busy) {
+        List<Span> b = merge(busy);
         List<Span> gaps = new ArrayList<>();
         for (Span seg : segments) {
             int cursor = seg.start();
@@ -69,33 +80,16 @@ final class DayPlanner {
         return gaps;
     }
 
-    static List<Span> clipPast(List<Span> gaps, LocalDate date, LocalDateTime now) {
-        if (date.isAfter(now.toLocalDate())) return gaps;
-        if (date.isBefore(now.toLocalDate())) return List.of();
-        int from = now.getHour() * 60 + now.getMinute() + 1;
+    static List<Span> clipFrom(List<Span> spans, int from) {
         List<Span> out = new ArrayList<>();
-        for (Span g : gaps) {
-            int s = Math.max(g.start(), from);
-            if (s < g.end()) out.add(new Span(s, g.end()));
+        for (Span s : spans) {
+            int start = Math.max(s.start(), from);
+            if (start < s.end()) out.add(new Span(start, s.end()));
         }
         return out;
     }
 
     static int sum(List<Span> spans) {
         return spans.stream().mapToInt(Span::minutes).sum();
-    }
-
-    static int fitMinutes(List<Span> gaps) {
-        int best = 0;
-        for (Span g : gaps) best = Math.max(best, g.end() - alignUp(g.start()));
-        return best;
-    }
-
-    static Integer earliestFit(List<Span> gaps, int total) {
-        for (Span g : gaps) {
-            int s = alignUp(g.start());
-            if (s + total <= g.end()) return s;
-        }
-        return null;
     }
 }
