@@ -37,37 +37,41 @@ class PagesTests {
         return res.getContentAsString(StandardCharsets.UTF_8);
     }
 
+    private String asset(String name) throws Exception {
+        return page("/" + name + ".html") + page("/css/" + name + ".css") + page("/js/" + name + ".js");
+    }
+
     @Test
     void customerPageHasExcelLikeGridAndNoAverage() throws Exception {
-        String html = page("/index.html");
-        assertTrue(html.contains("/day?date="));
-        assertTrue(html.contains("/bookings"));
-        assertTrue(html.contains("/calendar?days=60"));
-        assertTrue(html.contains("/services"));
-        assertTrue(html.contains("minhead"));
-        assertTrue(html.contains("hlRow"));
-        assertTrue(html.contains("hlCol"));
-        assertFalse(html.contains("avgMinutes"));
-        assertFalse(html.contains("minMinutes"));
-        assertFalse(html.contains("/windows"));
-        assertFalse(html.contains("/api/slots/"));
-        assertFalse(html.contains("innerHTML"));
+        String all = asset("index");
+        assertTrue(all.contains("/day?date="));
+        assertTrue(all.contains("/bookings"));
+        assertTrue(all.contains("/calendar?days=60"));
+        assertTrue(all.contains("/services"));
+        assertTrue(all.contains("minhead"));
+        assertTrue(all.contains("hlRow"));
+        assertTrue(all.contains("hlCol"));
+        assertFalse(all.contains("avgMinutes"));
+        assertFalse(all.contains("minMinutes"));
+        assertFalse(all.contains("/windows"));
+        assertFalse(all.contains("/api/slots/"));
+        assertFalse(all.contains("innerHTML"));
     }
 
     @Test
     void panelPageHasFiveTilesAndStepperServices() throws Exception {
-        String html = page("/panel.html");
-        assertTrue(html.contains("function showPanel"));
-        assertTrue(html.contains("/api/panel/hours"));
-        assertTrue(html.contains("/api/panel/services"));
-        assertTrue(html.contains("/api/panel/buffers"));
-        assertTrue(html.contains("/api/panel/bookings"));
-        assertTrue(html.contains("sval"));
-        assertFalse(html.contains("minMinutes"));
-        assertFalse(html.contains("/api/panel/windows"));
-        assertFalse(html.contains("/api/panel/day"));
-        assertFalse(html.contains("/api/panel/slots"));
-        assertFalse(html.contains("innerHTML"));
+        String all = asset("panel");
+        assertTrue(all.contains("function showPanel"));
+        assertTrue(all.contains("/api/panel/hours"));
+        assertTrue(all.contains("/api/panel/services"));
+        assertTrue(all.contains("/api/panel/buffers"));
+        assertTrue(all.contains("/api/panel/bookings"));
+        assertTrue(all.contains("sval"));
+        assertFalse(all.contains("minMinutes"));
+        assertFalse(all.contains("/api/panel/windows"));
+        assertFalse(all.contains("/api/panel/day"));
+        assertFalse(all.contains("/api/panel/slots"));
+        assertFalse(all.contains("innerHTML"));
     }
 
     @Test

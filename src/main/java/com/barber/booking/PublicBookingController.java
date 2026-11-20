@@ -56,11 +56,12 @@ public class PublicBookingController {
     private final ComboBufferRepository buffers;
     private final ClosedDayRepository closed;
     private final ApplicationEventPublisher events;
+    private final BookingAbuseGuard abuse;
 
     public PublicBookingController(BarbershopRepository shops, ServiceTypeRepository types,
             WorkRangeRepository workRanges, BookingRepository bookings,
             ComboBufferRepository buffers, ClosedDayRepository closed,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, BookingAbuseGuard abuse) {
         this.shops = shops;
         this.types = types;
         this.workRanges = workRanges;
@@ -68,6 +69,7 @@ public class PublicBookingController {
         this.buffers = buffers;
         this.closed = closed;
         this.events = events;
+        this.abuse = abuse;
     }
 
     @GetMapping("/services")
@@ -185,6 +187,7 @@ public class PublicBookingController {
                         "Bu vaxt artıq tutulub və ya uyğun deyil");
             }
         }
+        abuse.check(shopId, req.phone().trim());
         Booking saved = bookings.save(new Booking(shop, date, start, duration, buffer, choices,
                 req.name().trim(), req.phone().trim()));
         events.publishEvent(new BookingCreatedEvent(shopId, date, start, end));

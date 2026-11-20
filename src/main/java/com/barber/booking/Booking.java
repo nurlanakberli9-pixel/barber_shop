@@ -9,7 +9,8 @@ import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "booking",
-        indexes = @Index(name = "idx_booking_shop_date", columnList = "barbershop_id,booking_date"))
+        indexes = {@Index(name = "idx_booking_shop_date", columnList = "barbershop_id,booking_date"),
+                @Index(name = "idx_booking_phone", columnList = "customer_phone,created_at")})
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

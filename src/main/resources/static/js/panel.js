@@ -1,0 +1,707 @@
+const app = document.getElementById('app');
+const logoutBtn = document.getElementById('logout');
+const $ = (t, p = {}, ...k) => { const e = document.createElement(t); Object.assign(e, p); e.append(...k); return e; };
+const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmt = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+const toMin = t => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10);
+const todayKey = iso(new Date());
+const maxKey = iso(new Date(Date.now() + 59 * 864e5));
+let me = null;
+let date = todayKey;
+let setTileSub = null;
+let openSectionHook = null;
+let reloadBookings = null;
+
+function toast(text, type) {
+  const t = $('div', { className: 'toast ' + type, textContent: text });
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function csrf() {
+  try { await fetch('/api/csrf'); } catch (e) { return ''; }
+  const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+async function call(method, url, body) {
+  const headers = {};
+  const init = { method, headers };
+  if (method !== 'GET') headers['X-XSRF-TOKEN'] = await csrf();
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  try {
+    const r = await fetch(url, init);
+    const text = await r.text();
+    let data = null;
+    if (text) { try { data = JSON.parse(text); } catch (e) {} }
+    return { status: r.status, data };
+  } catch (e) {
+    return { status: 0, data: null };
+  }
+}
+
+function showLogin(message, ok) {
+  me = null;
+  logoutBtn.hidden = true;
+  const user = $('input', { type: 'text', autocomplete: 'username', autocapitalize: 'none', spellcheck: false, maxLength: 64 });
+  const pass = $('input', { type: 'password', autocomplete: 'current-password', maxLength: 128 });
+  const note = $('div');
+  if (message) { note.className = 'msg' + (ok ? ' ok' : ''); note.textContent = message; }
+  const btn = $('button', { className: 'green full', type: 'submit', textContent: 'Daxil ol' });
+  const form = $('form', {},
+    $('label', { textContent: 'İstifadəçi adı' }), user,
+    $('label', { textContent: 'Parol' }), pass, btn, note);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    btn.disabled = true;
+    note.className = ''; note.textContent = '';
+    let status = 0;
+    try {
+      const token = await csrf();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'X-XSRF-TOKEN': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: user.value.trim(), password: pass.value })
+      });
+      status = r.status;
+    } catch (err) { status = 0; }
+    pass.value = '';
+    if (status === 200) { boot(); return; }
+    btn.disabled = false;
+    note.className = 'msg';
+    note.textContent =
+      status === 401 ? 'İstifadəçi adı və ya parol səhvdir' :
+      status === 429 ? 'Çox sayda səhv cəhd oldu. 15 dəqiqə sonra yenidən cəhd edin' :
+      status === 403 ? 'Sessiya yenilənməlidir, səhifəni yeniləyin' :
+      'Xəta baş verdi, bağlantını yoxlayıb yenidən cəhd edin';
+  };
+  app.replaceChildren($('div', { className: 'panel' }, $('h2', { textContent: 'Bərbər girişi' }), form));
+}
+
+function sessionExpired() { showLogin('Sessiya bitdi, yenidən daxil olun'); }
+
+function phoneNode(p) {
+  return /^\+?[0-9]{9,15}$/.test(p)
+    ? $('a', { href: 'tel:' + p, textContent: p })
+    : $('span', { textContent: p });
+}
+
+function bookingsPanel() {
+  const box = $('div', { className: 'panel' });
+  const cancelledBox = $('div');
+  const list = $('div');
+  let kept = [];
+  let token = 0;
+
+  function renderCancelled() {
+    if (!kept.length) { cancelledBox.replaceChildren(); return; }
+    const close = $('button', { className: 'small ghost', textContent: 'Bağla' });
+    close.onclick = () => { kept = []; renderCancelled(); };
+    const wrap = $('div', { className: 'cancelled' },
+      $('b', { textContent: 'Ləğv edilən rezervlər. Müştərilərə zəng edib xəbər verin:' }));
+    kept.forEach(b => wrap.append($('div', { className: 'crow' },
+      $('span', { textContent: `${b.start}–${b.end} · ${b.customerName}` }),
+      phoneNode(b.customerPhone))));
+    wrap.append(close);
+    cancelledBox.replaceChildren(wrap);
+  }
+
+  function row(b) {
+    const info = $('div', { className: 'info' }, $('b', { textContent: b.customerName }));
+    info.append(phoneNode(b.customerPhone));
+    info.append($('span', { textContent: `${b.services.map(x => x.name).join(' + ')} · ${b.minutes} dəq` }));
+    const cancel = $('button', { className: 'small danger', textContent: 'Ləğv et' });
+    cancel.onclick = async () => {
+      if (!confirm(`${b.start}–${b.end} rezervi (${b.customerName}) ləğv edilsin? Müştəriyə xəbər getməyəcək, özünüz zəng edin.`)) return;
+      cancel.disabled = true;
+      const r = await call('POST', `/api/panel/bookings/${b.id}/cancel`);
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 204) { kept.push(b); renderCancelled(); toast('Rezerv ləğv edildi', 'ok'); }
+      else if (r.status === 404) toast('Bu rezerv artıq yoxdur', 'err');
+      else toast('Xəta baş verdi', 'err');
+      load();
+    };
+    return $('div', { className: 'row' }, $('div', { className: 'time', textContent: b.start }), info, cancel);
+  }
+
+  async function load() {
+    const t = ++token;
+    list.replaceChildren($('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', `/api/panel/bookings?date=${date}`);
+    if (t !== token) return;
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      list.replaceChildren($('div', { className: 'msg', textContent: 'Rezervləri yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    if (setTileSub) setTileSub('bookings', r.data.length ? `${r.data.length} rezerv` : 'Boşdur');
+    const d = new Date(date + 'T00:00:00');
+    list.replaceChildren(
+      $('p', { className: 'muted', textContent: `📅 ${d.getDate()} ${MONTHS[d.getMonth()]} · ${r.data.length} rezerv` }),
+      ...(r.data.length ? r.data.map(row)
+        : [$('p', { className: 'muted', textContent: 'Bu gün üçün rezerv yoxdur.' })]));
+  }
+
+  box.append($('h2', { textContent: 'Rezervlər' }), cancelledBox, list);
+  reloadBookings = load;
+  load();
+  return box;
+}
+
+function hoursPanel() {
+  const box = $('div', { className: 'panel' });
+  let rows = [];
+  let note = null;
+  let loaded = false;
+
+  function select(from, to, value, onchange) {
+    const sel = $('select');
+    const vals = [];
+    for (let m = from; m <= to; m += 15) vals.push(m);
+    if (!vals.includes(value)) { vals.push(value); vals.sort((a, b) => a - b); }
+    vals.forEach(m => sel.append($('option', { value: String(m), textContent: fmt(m) })));
+    sel.value = String(value);
+    sel.onchange = () => onchange(parseInt(sel.value, 10));
+    return sel;
+  }
+
+  function summary() {
+    return rows.map(r => `${fmt(r.start)}–${fmt(r.end)}`).join(', ');
+  }
+
+  function render() {
+    const list = rows.map((r, i) => {
+      const rm = $('button', { className: 'small ghost', textContent: '✕', ariaLabel: 'Aralığı sil' });
+      rm.onclick = () => { rows.splice(i, 1); note = null; render(); };
+      return $('div', { className: 'hrow' },
+        $('div', {}, $('label', { textContent: 'Başlama' }), select(300, 1425, r.start, v => { r.start = v; })),
+        $('div', {}, $('label', { textContent: 'Bitmə' }), select(315, 1435, r.end, v => { r.end = v; })),
+        rm);
+    });
+    const add = $('button', { className: 'small ghost', textContent: '+ Aralıq əlavə et' });
+    add.onclick = () => {
+      if (rows.length >= 6) { toast('Ən çox 6 aralıq ola bilər', 'err'); return; }
+      const last = rows.length ? rows[rows.length - 1].end : 480;
+      const s = Math.min(last + 60, 1380);
+      rows.push({ start: s, end: Math.min(s + 120, 1425) });
+      note = null;
+      render();
+    };
+    const save = $('button', { className: 'green full', textContent: 'Yadda saxla' });
+    save.onclick = async () => {
+      if (!rows.length) { note = { ok: false, text: 'Ən azı bir iş aralığı olmalıdır' }; render(); return; }
+      if (rows.some(r => r.end <= r.start)) { note = { ok: false, text: 'Bitmə vaxtı başlamadan sonra olmalıdır' }; render(); return; }
+      save.disabled = true;
+      const r = await call('PUT', '/api/panel/hours', { ranges: rows.map(x => ({ start: fmt(x.start), end: fmt(x.end) })) });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && Array.isArray(r.data)) {
+        rows = r.data.map(x => ({ start: toMin(x.start), end: toMin(x.end) }));
+        loaded = true;
+        note = { ok: true, text: 'Saxlanıldı. Hər gün üçün bu saatlar tətbiq olunur.' };
+        if (setTileSub) setTileSub('hours', summary());
+      } else {
+        note = { ok: false, text: r.status === 409 ? 'Mövcud rezervlər yeni iş saatlarından kənarda qalır. Əvvəl onları ləğv edin.'
+          : r.status === 400 ? 'Saat aralıqları düzgün deyil' : 'Xəta baş verdi, yenidən cəhd edin' };
+      }
+      render();
+    };
+    const els = [
+      $('h2', { textContent: 'İş saatları' }),
+      $('p', { className: 'muted', textContent: 'Hər gün üçün eyni saatlar tətbiq olunur. Aradakı vaxtda bərbər yoxdur. Toxunan aralıqlar birləşir.' })
+    ];
+    if (!loaded) els.push($('p', { className: 'muted', textContent: 'Saatlar hələ saxlanılmayıb. Düzəldib saxlayın.' }));
+    els.push(...list, $('div', { className: 'mt10' }, add), save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'İş saatları' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/hours');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      box.replaceChildren($('h2', { textContent: 'İş saatları' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    loaded = r.data.length > 0;
+    rows = loaded ? r.data.map(x => ({ start: toMin(x.start), end: toMin(x.end) })) : [{ start: 480, end: 1020 }];
+    if (setTileSub) setTileSub('hours', loaded ? summary() : 'Qurulmayıb');
+    render();
+  }
+
+  load();
+  return box;
+}
+
+function servicesPanel() {
+  const box = $('div', { className: 'panel' });
+  const ORDER = ['low', 'medium', 'high'];
+  let meta = [];
+  let state = {};
+  let note = null;
+
+  function init(list) {
+    meta = list;
+    state = {};
+    list.forEach(s => {
+      state[s.code] = s.levels
+        ? { low: s.low || 5, medium: s.medium || 5, high: s.high || 5 }
+        : { minutes: s.minutes || 5 };
+    });
+  }
+
+  function normalize(o, key) {
+    const i = ORDER.indexOf(key);
+    for (let j = i + 1; j < 3; j++) if (o[ORDER[j]] < o[key]) o[ORDER[j]] = o[key];
+    for (let j = i - 1; j >= 0; j--) if (o[ORDER[j]] > o[key]) o[ORDER[j]] = o[key];
+  }
+
+  function stepper(o, key, isLevel) {
+    const minus = $('button', { type: 'button', className: 'small ghost step', textContent: '−5', ariaLabel: '5 dəqiqə azalt' });
+    const plus = $('button', { type: 'button', className: 'small ghost step', textContent: '+5', ariaLabel: '5 dəqiqə artır' });
+    const val = $('b', { className: 'sval', textContent: o[key] + ' dəq' });
+    minus.disabled = o[key] <= 5;
+    plus.disabled = o[key] >= 240;
+    const change = d => {
+      o[key] = Math.min(240, Math.max(5, o[key] + d));
+      if (isLevel) normalize(o, key);
+      note = null;
+      render();
+    };
+    minus.onclick = () => change(-5);
+    plus.onclick = () => change(5);
+    return $('div', { className: 'stepper' }, minus, val, plus);
+  }
+
+  function render() {
+    const els = [
+      $('h2', { textContent: 'Xidmətlər' }),
+      $('p', { className: 'muted', textContent: 'Hər xidmətin müddətini 5 dəqiqəlik addımlarla təyin edin (ən azı 5 dəq). Saç və saqqal üçün az, orta və çox variantı ayrıca yazılır.' })
+    ];
+    meta.forEach(s => {
+      els.push($('div', { className: 'grp', textContent: s.name }));
+      const o = state[s.code];
+      if (s.levels) {
+        const noun = s.code === 'BEARD' ? 'saqqalı' : 'saçı';
+        [['low', 'Az'], ['medium', 'Orta'], ['high', 'Çox']].forEach(([k, word]) => {
+          els.push($('div', { className: 'srow' }, $('span', { textContent: `${word} ${noun} olan` }), stepper(o, k, true)));
+        });
+      } else {
+        els.push($('div', { className: 'srow' }, $('span', { textContent: 'Müddət' }), stepper(o, 'minutes', false)));
+      }
+    });
+    const save = $('button', { className: 'green full', textContent: 'Müddətləri saxla' });
+    save.onclick = async () => {
+      save.disabled = true;
+      const services = meta.map(s => s.levels
+        ? { code: s.code, low: state[s.code].low, medium: state[s.code].medium, high: state[s.code].high }
+        : { code: s.code, minutes: state[s.code].minutes });
+      const r = await call('PUT', '/api/panel/services', { services });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && r.data) {
+        init(r.data.services);
+        note = { ok: true, text: 'Saxlanıldı. Müştərilər bu müddətlərlə rezerv edəcək.' };
+        if (setTileSub) setTileSub('services', 'Yazılıb');
+      } else {
+        note = { ok: false, text: r.status === 400 ? 'Müddətlər düzgün deyil' : 'Xəta baş verdi, yenidən cəhd edin' };
+      }
+      render();
+    };
+    els.push(save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'Xidmətlər' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/services');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !r.data) {
+      box.replaceChildren($('h2', { textContent: 'Xidmətlər' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    const ready = r.data.services.every(s => s.levels ? (s.low != null && s.medium != null && s.high != null) : s.minutes != null);
+    if (setTileSub) setTileSub('services', ready ? 'Yazılıb' : 'Yazılmayıb');
+    init(r.data.services);
+    render();
+  }
+
+  load();
+  return box;
+}
+
+function buffersPanel() {
+  const box = $('div', { className: 'panel' });
+  const OPTS = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120];
+  let note = null;
+
+  function fill(list) {
+    const selects = [];
+    const titles = { 1: 'Tək xidmət', 2: 'İkili kombinasiya', 3: 'Üçlü kombinasiya' };
+    const els = [
+      $('h2', { textContent: 'Ardıcıl qaydalar' }),
+      $('p', { className: 'muted', textContent: 'Müştəri xidməti seçib bitirəndən sonra növbəti rezerv nə vaxt başlaya bilər? "Dərhal" seçsəniz, növbəti rezerv elə həmin dəqiqədən başlaya bilər.' })
+    ];
+    let lastSize = 0;
+    list.forEach(b => {
+      if (b.services.length !== lastSize) {
+        lastSize = b.services.length;
+        els.push($('div', { className: 'grp', textContent: titles[lastSize] }));
+      }
+      const sel = $('select');
+      const vals = OPTS.includes(b.afterMinutes) ? OPTS : OPTS.concat([b.afterMinutes]).sort((x, y) => x - y);
+      vals.forEach(v => sel.append($('option', { value: String(v), textContent: v === 0 ? 'Dərhal' : `${v} dəq sonra` })));
+      sel.value = String(b.afterMinutes);
+      selects.push({ services: b.services, sel });
+      els.push($('div', { className: 'q', textContent: `${b.label} rezerv olunsa, növbəti rezerv:` }), sel);
+    });
+    const save = $('button', { className: 'green full', textContent: 'Qaydaları saxla' });
+    save.onclick = async () => {
+      save.disabled = true;
+      const r = await call('PUT', '/api/panel/buffers', { buffers: selects.map(x => ({ services: x.services, afterMinutes: parseInt(x.sel.value, 10) })) });
+      if (r.status === 401) return sessionExpired();
+      if (r.status === 200 && Array.isArray(r.data)) {
+        note = { ok: true, text: 'Saxlanıldı. Yeni rezervlərə tətbiq olunur.' };
+        fill(r.data);
+      } else {
+        note = { ok: false, text: 'Xəta baş verdi, yenidən cəhd edin' };
+        fill(list);
+      }
+    };
+    els.push(save);
+    if (note) els.push($('div', { className: 'msg' + (note.ok ? ' ok' : ''), textContent: note.text }));
+    box.replaceChildren(...els);
+  }
+
+  async function load() {
+    box.replaceChildren($('h2', { textContent: 'Ardıcıl qaydalar' }), $('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    const r = await call('GET', '/api/panel/buffers');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      box.replaceChildren($('h2', { textContent: 'Ardıcıl qaydalar' }), $('div', { className: 'msg', textContent: 'Yükləmək alınmadı. Səhifəni yeniləyin.' }));
+      return;
+    }
+    fill(r.data);
+  }
+
+  load();
+  return box;
+}
+
+function closedPanel() {
+  const box = $('div', { className: 'panel' });
+  const picker = $('input', { type: 'date', value: todayKey, min: todayKey, max: maxKey });
+  const list = $('div');
+  const result = $('div');
+  let days = [];
+  const label = k => { const d = new Date(k + 'T00:00:00'); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+  const nowMinute = () => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); };
+
+  function renderList() {
+    if (!days.length) {
+      list.replaceChildren($('p', { className: 'muted', textContent: 'Bağlı gün yoxdur.' }));
+      return;
+    }
+    list.replaceChildren(...days.map(k => {
+      const open = $('button', { type: 'button', className: 'small ghost', textContent: 'Aç' });
+      open.onclick = async () => {
+        open.disabled = true;
+        const r = await call('DELETE', `/api/panel/closed/${k}`);
+        if (r.status === 401) return sessionExpired();
+        if (r.status === 204) toast(`${label(k)} günü yenidən açıldı`, 'ok');
+        else toast('Xəta baş verdi', 'err');
+        load();
+      };
+      return $('div', { className: 'row' }, $('div', { className: 'info' }, $('b', { textContent: label(k) })), open);
+    }));
+  }
+
+  async function load() {
+    const r = await call('GET', '/api/panel/closed');
+    if (r.status === 401) return sessionExpired();
+    if (r.status !== 200 || !Array.isArray(r.data)) {
+      list.replaceChildren($('div', { className: 'msg', textContent: 'Bağlı günləri yükləmək alınmadı.' }));
+      return;
+    }
+    days = r.data;
+    if (setTileSub) setTileSub('closed', days.length ? `${days.length} gün bağlı` : '');
+    renderList();
+  }
+
+  const closeBtn = $('button', { type: 'button', className: 'danger full', textContent: 'Bu günü bağla' });
+  closeBtn.onclick = async () => {
+    const k = picker.value;
+    if (!k || k < todayKey || k > maxKey) { toast('Tarix bugündən 60 günlük aralıqda olmalıdır', 'err'); return; }
+    if (days.includes(k)) { toast('Bu gün artıq bağlıdır', 'err'); return; }
+    closeBtn.disabled = true;
+    const b = await call('GET', `/api/panel/bookings?date=${k}`);
+    if (b.status === 401) return sessionExpired();
+    if (b.status !== 200 || !Array.isArray(b.data)) {
+      closeBtn.disabled = false;
+      toast('Rezervləri yoxlamaq alınmadı', 'err');
+      return;
+    }
+    const upcoming = b.data.filter(x => k !== todayKey || toMin(x.end) > nowMinute());
+    let ok;
+    if (upcoming.length) {
+      const lines = upcoming.map(x => `${x.start}–${x.end}  ${x.customerName}  ${x.customerPhone}`).join('\n');
+      ok = confirm(`${label(k)} günü bağlananda ${upcoming.length} rezerv ləğv olunacaq:\n\n${lines}\n\nMüştərilərə xəbər getməyəcək, özünüz zəng edin. Davam edək?`);
+    } else {
+      ok = confirm(`${label(k)} günü bağlansın? Həmin gün müştərilər rezerv edə bilməyəcək.`);
+    }
+    if (!ok) { closeBtn.disabled = false; return; }
+    const q = upcoming.length ? '?cancelBookingIds=' + upcoming.map(x => x.id).join(',') : '';
+    const r = await call('POST', `/api/panel/closed/${k}${q}`);
+    closeBtn.disabled = false;
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 204) {
+      result.replaceChildren();
+      if (upcoming.length) {
+        const wrap = $('div', { className: 'cancelled' }, $('b', { textContent: 'Ləğv edilən rezervlər. Müştərilərə zəng edib xəbər verin:' }));
+        upcoming.forEach(x => wrap.append($('div', { className: 'crow' },
+          $('span', { textContent: `${x.start}–${x.end} · ${x.customerName}` }), phoneNode(x.customerPhone))));
+        result.append(wrap);
+      }
+      toast(`${label(k)} günü bağlandı`, 'ok');
+      load();
+      if (reloadBookings) reloadBookings();
+    } else if (r.status === 409) {
+      toast('Bu arada yeni rezerv gəlib, yenidən cəhd edin', 'err');
+      if (reloadBookings) reloadBookings();
+    } else {
+      toast('Xəta baş verdi, yenidən cəhd edin', 'err');
+    }
+  };
+
+  box.append($('h2', { textContent: 'İstirahət günləri' }),
+    $('p', { className: 'muted', textContent: 'Bağlanan gündə müştərilər rezerv edə bilməz və gün saytda boz görünür.' }),
+    $('label', { textContent: 'Bağlanacaq gün' }), picker, closeBtn, result,
+    $('div', { className: 'grp', textContent: 'Bağlı günlər' }), list);
+  load();
+  return box;
+}
+
+function accountPanel() {
+  const box = $('div', { className: 'panel' });
+
+  const cur = $('input', { type: 'password', autocomplete: 'current-password', maxLength: 72 });
+  const nw = $('input', { type: 'password', autocomplete: 'new-password', maxLength: 72 });
+  const rep = $('input', { type: 'password', autocomplete: 'new-password', maxLength: 72 });
+  const pwNote = $('div');
+  const pwBtn = $('button', { type: 'button', className: 'green full', textContent: 'Parolu dəyiş' });
+  pwBtn.onclick = async () => {
+    pwNote.className = ''; pwNote.textContent = '';
+    const bad = m => { pwNote.className = 'msg'; pwNote.textContent = m; };
+    if (nw.value.length < 10) return bad('Yeni parol ən azı 10 simvol olmalıdır');
+    if (new TextEncoder().encode(nw.value).length > 72) return bad('Yeni parol çox uzundur');
+    if (nw.value !== rep.value) return bad('Yeni parol və təkrarı eyni deyil');
+    pwBtn.disabled = true;
+    const r = await call('POST', '/api/panel/password', { currentPassword: cur.value, newPassword: nw.value });
+    pwBtn.disabled = false;
+    if (r.status === 401) return sessionExpired();
+    if (r.status === 204) {
+      cur.value = ''; nw.value = ''; rep.value = '';
+      pwNote.className = 'msg ok';
+      pwNote.textContent = 'Parol dəyişdirildi';
+    } else if (r.status === 422) bad('Cari parol səhvdir');
+    else if (r.status === 400) bad('Yeni parol uyğun deyil (10-72 simvol, cari paroldan fərqli)');
+    else bad('Xəta baş verdi, yenidən cəhd edin');
+  };
+
+  const pushBox = $('div');
+  let st = null;
+  const b64ToBytes = v => {
+    const pad4 = '='.repeat((4 - v.length % 4) % 4);
+    const raw = atob((v + pad4).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  };
+  const sameKey = (buf, bytes) => {
+    if (!buf) return false;
+    const a = new Uint8Array(buf);
+    return a.length === bytes.length && a.every((x, i) => x === bytes[i]);
+  };
+  const sendSub = sub => {
+    const j = sub.toJSON();
+    return call('POST', '/api/panel/push/subscribe', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+  };
+
+  async function initPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return { unsupported: true };
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const k = await call('GET', '/api/panel/push/key');
+      if (k.status === 401) { sessionExpired(); return null; }
+      if (k.status !== 200 || !k.data) return { error: true };
+      const key = b64ToBytes(k.data.publicKey);
+      let sub = await reg.pushManager.getSubscription();
+      if (sub && !sameKey(sub.options && sub.options.applicationServerKey, key)) {
+        await sub.unsubscribe();
+        sub = null;
+      }
+      if (sub && Notification.permission === 'granted') await sendSub(sub);
+      return { reg, sub, key, ephemeral: !!k.data.ephemeral };
+    } catch (e) {
+      return { error: true };
+    }
+  }
+
+  function renderPush(message) {
+    const els = [$('div', { className: 'grp', textContent: 'Bildirişlər' })];
+    if (!st) {
+      els.push($('p', { className: 'muted', textContent: 'Yüklənir...' }));
+    } else if (st.unsupported) {
+      els.push($('p', { className: 'muted', textContent: 'Bu brauzer bildirişləri dəstəkləmir. iPhone-da paneli əvvəlcə ana ekrana əlavə edin (Paylaş, sonra Ana ekrana əlavə et).' }));
+    } else if (st.error) {
+      els.push($('div', { className: 'msg', textContent: 'Bildiriş xidməti hazırlana bilmədi. Səhifəni yeniləyin.' }));
+    } else if (Notification.permission === 'denied') {
+      els.push($('div', { className: 'msg', textContent: 'Bildirişlər brauzerdə bloklanıb. Brauzer və ya sayt ayarlarından icazə verin.' }));
+    } else if (st.sub) {
+      const test = $('button', { type: 'button', className: 'small ghost', textContent: 'Test bildirişi' });
+      test.onclick = async () => {
+        test.disabled = true;
+        const r = await call('POST', '/api/panel/push/test');
+        test.disabled = false;
+        if (r.status === 401) return sessionExpired();
+        if (r.status === 200 && r.data && r.data.sent > 0) toast('Test bildirişi göndərildi', 'ok');
+        else if (r.status === 409) toast('Aktiv cihaz tapılmadı', 'err');
+        else toast('Göndərilmədi. Bildirişi söndürüb yenidən aktivləşdirin', 'err');
+      };
+      const off = $('button', { type: 'button', className: 'small danger', textContent: 'Söndür' });
+      off.onclick = async () => {
+        off.disabled = true;
+        try {
+          const j = st.sub.toJSON();
+          await call('POST', '/api/panel/push/unsubscribe', { endpoint: j.endpoint });
+          await st.sub.unsubscribe();
+        } catch (e) {}
+        st.sub = null;
+        renderPush('Bildirişlər söndürüldü');
+      };
+      els.push($('p', { textContent: '✅ Bu cihazda bildirişlər aktivdir' }), $('div', { className: 'wh' }, test, off));
+    } else {
+      const on = $('button', { type: 'button', className: 'green full', textContent: 'Bildirişləri aç' });
+      on.onclick = async () => {
+        on.disabled = true;
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') { renderPush('İcazə verilmədi'); return; }
+          const sub = await st.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: st.key });
+          const r = await sendSub(sub);
+          if (r.status === 401) return sessionExpired();
+          if (r.status !== 204) {
+            await sub.unsubscribe();
+            renderPush('Cihaz qeydə alınmadı, yenidən cəhd edin');
+            return;
+          }
+          st.sub = sub;
+          renderPush('Bildirişlər aktivləşdirildi');
+        } catch (e) {
+          renderPush('Bildirişi aktivləşdirmək alınmadı');
+        }
+      };
+      els.push($('p', { className: 'muted', textContent: 'Yeni rezerv gələndə telefona bildiriş gəlsin (sayt bağlı olsa da).' }), on);
+    }
+    if (st && st.ephemeral) {
+      els.push($('p', { className: 'muted', textContent: 'Test açarı istifadə olunur: server yenidən başlayanda bildirişi yenidən aktivləşdirin.' }));
+    }
+    if (message) els.push($('div', { className: 'msg ok', textContent: message }));
+    pushBox.replaceChildren(...els);
+  }
+
+  box.append($('h2', { textContent: 'Hesab' }), pushBox,
+    $('div', { className: 'grp', textContent: 'Parolu dəyiş' }),
+    $('label', { textContent: 'Cari parol' }), cur,
+    $('label', { textContent: 'Yeni parol (ən azı 10 simvol)' }), nw,
+    $('label', { textContent: 'Yeni parolun təkrarı' }), rep,
+    pwBtn, pwNote);
+  renderPush();
+  initPush().then(r => { st = r; if (r) renderPush(); });
+  return box;
+}
+
+function showPanel() {
+  logoutBtn.hidden = false;
+  const dateInput = $('input', { type: 'date', value: date, min: todayKey, max: maxKey });
+  const subs = {};
+  setTileSub = (id, text) => { if (subs[id]) subs[id].textContent = text; };
+  const dateText = () => {
+    const d = new Date(date + 'T00:00:00');
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  };
+  dateInput.onchange = () => {
+    const v = dateInput.value;
+    if (!v || v < todayKey || v > maxKey) {
+      toast('Tarix bugündən 60 günlük aralıqda olmalıdır', 'err');
+      dateInput.value = date;
+      return;
+    }
+    date = v;
+    setTileSub('date', dateText());
+    if (reloadBookings) reloadBookings();
+  };
+
+  const sections = [
+    { id: 'date', icon: '📅', title: 'Gün',
+      node: $('div', { className: 'panel' }, $('label', { textContent: 'Rezervlərə baxmaq üçün gün seçin' }), dateInput) },
+    { id: 'bookings', icon: '📋', title: 'Rezervlər', node: bookingsPanel() },
+    { id: 'hours', icon: '🕒', title: 'İş saatları', node: hoursPanel() },
+    { id: 'services', icon: '🧰', title: 'Xidmətlər', node: servicesPanel() },
+    { id: 'buffers', icon: '⏱️', title: 'Ardıcıl qaydalar', node: buffersPanel() },
+    { id: 'closed', icon: '🏖️', title: 'İstirahət günləri', node: closedPanel() },
+    { id: 'account', icon: '👤', title: 'Hesab', node: accountPanel() }
+  ];
+  const tiles = $('div', { className: 'tiles' });
+  const bodies = $('div');
+  const tileEls = {};
+  let openId = 'bookings';
+
+  function applyOpen() {
+    sections.forEach(sec => {
+      const on = openId === sec.id;
+      tileEls[sec.id].classList.toggle('on', on);
+      tileEls[sec.id].setAttribute('aria-expanded', on ? 'true' : 'false');
+      sec.wrap.hidden = !on;
+    });
+  }
+  openSectionHook = id => { openId = id; applyOpen(); };
+
+  sections.forEach(sec => {
+    const sub = $('span', { className: 'sub' });
+    subs[sec.id] = sub;
+    const t = $('button', { type: 'button', className: 'tile' },
+      $('span', { className: 'ti', textContent: sec.icon }),
+      $('b', { textContent: sec.title }), sub);
+    t.onclick = () => { openId = openId === sec.id ? null : sec.id; applyOpen(); };
+    tileEls[sec.id] = t;
+    tiles.append(t);
+    sec.wrap = $('div', { className: 'secbody' }, sec.node);
+    bodies.append(sec.wrap);
+  });
+  setTileSub('date', dateText());
+  applyOpen();
+
+  app.replaceChildren(
+    $('div', { className: 'panel' }, $('h2', { textContent: `${me.masterName} @ ${me.shopName}` })),
+    tiles, bodies);
+}
+
+logoutBtn.onclick = async () => {
+  logoutBtn.disabled = true;
+  await call('POST', '/api/logout');
+  logoutBtn.disabled = false;
+  showLogin('Çıxış edildi', true);
+};
+
+async function boot() {
+  const r = await call('GET', '/api/panel/me');
+  if (r.status === 200 && r.data) { me = r.data; showPanel(); }
+  else if (r.status === 401) showLogin();
+  else app.replaceChildren($('div', { className: 'msg', textContent: 'Serverə qoşulmaq alınmadı. Səhifəni yeniləyin.' }));
+}
+boot();

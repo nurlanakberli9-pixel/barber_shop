@@ -8,6 +8,7 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/Barbershop.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BarbershopRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/Booking.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/BookingAbuseGuard.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingApplication.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingCreatedEvent.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/BookingNotifier.java
@@ -34,7 +35,10 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/PushSender.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PushSubscription.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PushSubscriptionRepository.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/RateLimitFilter.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/RateLimiter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/SecurityHeadersFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceKind.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceType.java

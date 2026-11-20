@@ -32,22 +32,26 @@ class PagesExtraTests {
         return res.getContentAsString(StandardCharsets.UTF_8);
     }
 
+    private String asset(String name) throws Exception {
+        return page("/" + name + ".html") + page("/css/" + name + ".css") + page("/js/" + name + ".js");
+    }
+
     @Test
     void panelHasClosedDaysAndAccountSections() throws Exception {
-        String html = page("/panel.html");
-        assertTrue(html.contains("function closedPanel"));
-        assertTrue(html.contains("function accountPanel"));
-        assertTrue(html.contains("/api/panel/closed"));
-        assertTrue(html.contains("/api/panel/push"));
-        assertTrue(html.contains("/api/panel/password"));
-        assertTrue(html.contains("İstirahət günləri"));
-        assertTrue(html.contains("cancelBookingIds"));
-        assertFalse(html.contains("innerHTML"));
+        String all = asset("panel");
+        assertTrue(all.contains("function closedPanel"));
+        assertTrue(all.contains("function accountPanel"));
+        assertTrue(all.contains("/api/panel/closed"));
+        assertTrue(all.contains("/api/panel/push"));
+        assertTrue(all.contains("/api/panel/password"));
+        assertTrue(all.contains("İstirahət günləri"));
+        assertTrue(all.contains("cancelBookingIds"));
+        assertFalse(all.contains("innerHTML"));
     }
 
     @Test
     void adminPageAndServiceWorkerArePublicButAdminApiIsNot() throws Exception {
-        String admin = page("/admin.html");
+        String admin = asset("admin");
         assertTrue(admin.contains("/api/admin/barbers"));
         assertFalse(admin.contains("innerHTML"));
         String sw = page("/sw.js");
@@ -58,9 +62,10 @@ class PagesExtraTests {
     }
 
     @Test
-    void customerPageLabelsUnratedShopsAsNew() throws Exception {
-        String html = page("/index.html");
-        assertTrue(html.contains("return 'Yeni'"));
-        assertFalse(html.contains("innerHTML"));
+    void customerPageLabelsUnratedShopsAsNewAndHandlesRateLimit() throws Exception {
+        String all = asset("index");
+        assertTrue(all.contains("return 'Yeni'"));
+        assertTrue(all.contains("st === 429"));
+        assertFalse(all.contains("innerHTML"));
     }
 }

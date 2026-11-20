@@ -12,6 +12,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration
@@ -19,13 +20,14 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, LoginAttemptService attempts)
-            throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, LoginAttemptService attempts,
+            RateLimiter limiter) throws Exception {
         http
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/panel.html",
-                        "/admin.html", "/sw.js", "/favicon.ico", "/api/csrf").permitAll()
+                        "/admin.html", "/sw.js", "/favicon.ico", "/css/**", "/js/**",
+                        "/api/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/shops/*/bookings", "/api/login",
                         "/api/logout").permitAll()
@@ -51,6 +53,8 @@ public class SecurityConfig {
                 .logoutUrl("/api/logout")
                 .deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((req, res, auth) -> res.setStatus(HttpStatus.OK.value())))
+            .addFilterBefore(new SecurityHeadersFilter(), CsrfFilter.class)
+            .addFilterBefore(new RateLimitFilter(limiter), CsrfFilter.class)
             .addFilterBefore(new LoginThrottleFilter(attempts),
                     UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(e -> e.authenticationEntryPoint(
