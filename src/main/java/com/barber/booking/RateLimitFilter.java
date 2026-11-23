@@ -30,7 +30,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Rule("admin", null, Pattern.compile("^/api/admin/.*$"), 120, 10 * MIN),
             new Rule("push-test", "POST", Pattern.compile("^/api/panel/push/test$"), 10, HOUR),
             new Rule("password", "POST", Pattern.compile("^/api/panel/password$"), 10, HOUR),
-            new Rule("public-read", "GET", Pattern.compile("^/api/(shops(/.*)?|csrf)$"), 240, MIN));
+            new Rule("public-read", "GET", Pattern.compile("^/api/(shops(/.*)?|csrf)$"), 240, MIN),
+            new Rule("health", "GET", Pattern.compile("^/actuator/health(/.*)?$"), 120, MIN));
 
     private final RateLimiter limiter;
 
@@ -42,7 +43,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
             FilterChain chain) throws ServletException, IOException {
         String path = req.getRequestURI();
-        if (path != null && path.startsWith("/api/")) {
+        if (path != null && (path.startsWith("/api/") || path.startsWith("/actuator/"))) {
             String method = req.getMethod();
             if (("POST".equals(method) || "PUT".equals(method)) && req.getContentLengthLong() > MAX_BODY) {
                 res.setStatus(413);

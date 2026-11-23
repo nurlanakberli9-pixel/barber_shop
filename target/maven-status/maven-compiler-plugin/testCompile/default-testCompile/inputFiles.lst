@@ -1,12 +1,15 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/AbuseGuardTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/AccountSeedTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/AccountTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/ActuatorTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/AdminTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingApplicationTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingConcurrencyTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/BookingFlowTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/ClosedDayTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/DatabaseConstraintTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/DbErrorHandlerTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/LogSafetyTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/LoginTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/MigrationTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/PagesExtraTests.java
@@ -16,5 +19,7 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/PushTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RateLimitFilterTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RateLimiterTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/RequestIdIntegrationTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/RequestLogFilterTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/SecurityHeadersTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/ServiceOrderConstraintTests.java

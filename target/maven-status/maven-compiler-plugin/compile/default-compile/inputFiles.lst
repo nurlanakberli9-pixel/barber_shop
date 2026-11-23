@@ -1,6 +1,7 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/AccountController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AdminBootstrap.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AdminController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ApiExceptionHandler.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUser.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUserDetailsService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/AppUserRepository.java
@@ -38,6 +39,7 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/PushSubscriptionRepository.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/RateLimitFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/RateLimiter.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/RequestLogFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityConfig.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/SecurityHeadersFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ServiceController.java

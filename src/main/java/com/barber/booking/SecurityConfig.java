@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/panel.html",
                         "/admin.html", "/sw.js", "/favicon.ico", "/css/**", "/js/**",
                         "/api/csrf").permitAll()
+                .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/shops/*/bookings", "/api/login",
                         "/api/logout").permitAll()
@@ -53,6 +54,7 @@ public class SecurityConfig {
                 .logoutUrl("/api/logout")
                 .deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((req, res, auth) -> res.setStatus(HttpStatus.OK.value())))
+            .addFilterBefore(new RequestLogFilter(), CsrfFilter.class)
             .addFilterBefore(new SecurityHeadersFilter(), CsrfFilter.class)
             .addFilterBefore(new RateLimitFilter(limiter), CsrfFilter.class)
             .addFilterBefore(new LoginThrottleFilter(attempts),

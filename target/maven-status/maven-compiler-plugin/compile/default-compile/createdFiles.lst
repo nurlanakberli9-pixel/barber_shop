@@ -18,6 +18,7 @@ com/barber/booking/BarbershopRepository.class
 com/barber/booking/ServiceController$ServiceUpdate.class
 com/barber/booking/HoursController$HoursRequest.class
 com/barber/booking/PushController$SentDto.class
+com/barber/booking/RequestLogFilter.class
 com/barber/booking/Level.class
 com/barber/booking/PushConfig.class
 com/barber/booking/AdminController$CreateBarber.class
@@ -63,6 +64,7 @@ com/barber/booking/PublicBookingController$ServiceInfo.class
 com/barber/booking/PushController.class
 com/barber/booking/AccountController$PasswordRequest.class
 com/barber/booking/Barbershop.class
+com/barber/booking/ApiExceptionHandler.class
 com/barber/booking/RateLimiter.class
 com/barber/booking/Combos.class
 com/barber/booking/ServiceController$ServicesRequest.class
