@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.barber.booking.AdminTests
 -------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.586 s -- in com.barber.booking.AdminTests
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.994 s -- in com.barber.booking.AdminTests

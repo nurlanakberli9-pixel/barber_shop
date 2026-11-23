@@ -75,6 +75,7 @@ com/barber/booking/LoginThrottleFilter.class
 com/barber/booking/PushSubscription.class
 com/barber/booking/AuthController.class
 com/barber/booking/AdminController$EnabledRequest.class
+com/barber/booking/ProdDatabaseGuard.class
 com/barber/booking/BufferController$BuffersRequest.class
 com/barber/booking/AppUserDetailsService.class
 com/barber/booking/AdminController.class

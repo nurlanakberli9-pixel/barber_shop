@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.barber.booking.PushTests
 -------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.083 s -- in com.barber.booking.PushTests
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.159 s -- in com.barber.booking.PushTests
