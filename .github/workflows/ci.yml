@@ -45,3 +45,40 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - run: ./mvnw -B test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image qurulur
+        run: docker build -t barber:ci .
+      - name: Konteyner root deyil
+        run: |
+          uid=$(docker run --rm --entrypoint id barber:ci -u)
+          echo "uid=$uid"
+          test "$uid" != "0"
+      - name: prod profili PostgreSQL olmadan başlamır
+        run: |
+          set +e
+          timeout 150 docker run --rm -e SPRING_PROFILES_ACTIVE=prod barber:ci > prod.log 2>&1
+          code=$?
+          set -e
+          echo "çıxış kodu: $code"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 124 ]; then
+            tail -20 prod.log
+            exit 1
+          fi
+      - name: Konteyner işə düşür və smoke test keçir
+        run: |
+          docker run -d --name barber -p 8080:8080 \
+            -e ADMIN_PASSWORD='ci-admin-password-1' \
+            -e BARBER_SEED_PASSWORD='ci-barber-password-1' barber:ci
+          for i in $(seq 1 60); do
+            if curl -fs http://localhost:8080/actuator/health/readiness > /dev/null; then break; fi
+            sleep 3
+          done
+          chmod +x scripts/smoke.sh
+          if ! ADMIN_PASSWORD='ci-admin-password-1' ./scripts/smoke.sh http://localhost:8080; then
+            docker logs barber | tail -60
+            exit 1
+          fi

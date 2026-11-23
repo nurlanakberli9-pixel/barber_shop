@@ -29,6 +29,7 @@
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginAttemptService.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/LoginThrottleFilter.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PanelBookingController.java
+/workspaces/barber_shop/src/main/java/com/barber/booking/ProdConfigGuard.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/ProdDatabaseGuard.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PublicBookingController.java
 /workspaces/barber_shop/src/main/java/com/barber/booking/PushConfig.java

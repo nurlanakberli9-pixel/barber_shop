@@ -31,7 +31,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Rule("push-test", "POST", Pattern.compile("^/api/panel/push/test$"), 10, HOUR),
             new Rule("password", "POST", Pattern.compile("^/api/panel/password$"), 10, HOUR),
             new Rule("public-read", "GET", Pattern.compile("^/api/(shops(/.*)?|csrf)$"), 240, MIN),
-            new Rule("health", "GET", Pattern.compile("^/actuator/health(/.*)?$"), 120, MIN));
+            new Rule("health", null, Pattern.compile("^/actuator/health(/.*)?$"), 120, MIN));
 
     private final RateLimiter limiter;
 

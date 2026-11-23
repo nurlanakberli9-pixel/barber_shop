@@ -67,6 +67,7 @@ com/barber/booking/Barbershop.class
 com/barber/booking/ApiExceptionHandler.class
 com/barber/booking/RateLimiter.class
 com/barber/booking/Combos.class
+com/barber/booking/ProdConfigGuard.class
 com/barber/booking/ServiceController$ServicesRequest.class
 com/barber/booking/Booking.class
 com/barber/booking/PushController$SubscribeRequest.class

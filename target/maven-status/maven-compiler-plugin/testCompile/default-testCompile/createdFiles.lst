@@ -16,8 +16,11 @@ com/barber/booking/AdminTests.class
 com/barber/booking/RequestIdIntegrationTests.class
 com/barber/booking/PushTests.class
 com/barber/booking/PanelSetupTests.class
+com/barber/booking/DeployFilesTests.class
+com/barber/booking/ProdConfigGuardTests.class
 com/barber/booking/MigrationTests.class
 com/barber/booking/AccountSeedTests.class
+com/barber/booking/DeployConfigTests.class
 com/barber/booking/LoginTests.class
 com/barber/booking/PagesTests.class
 com/barber/booking/RateLimitFilterTests.class

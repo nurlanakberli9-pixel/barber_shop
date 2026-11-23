@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.env.*
+.secrets.local
+target
+backups
+docs
+scripts
+*.log
+docker-compose.yml

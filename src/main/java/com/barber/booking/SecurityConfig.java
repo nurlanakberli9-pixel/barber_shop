@@ -29,6 +29,7 @@ public class SecurityConfig {
                         "/admin.html", "/sw.js", "/favicon.ico", "/css/**", "/js/**",
                         "/api/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/*").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/actuator/health", "/actuator/health/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/shops/*/bookings", "/api/login",
                         "/api/logout").permitAll()

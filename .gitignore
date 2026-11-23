@@ -27,3 +27,4 @@ app.log
 jar.txt
 .env
 backups/
+.secrets.local
