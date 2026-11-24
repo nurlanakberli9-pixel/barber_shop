@@ -8,7 +8,7 @@ Digər `/actuator/*` ünvanları bağlıdır.
 
 ## Kənar nəzarət (pulsuz)
 UptimeRobot və ya BetterStack-də HTTP monitor yarat:
-- ünvan: `https://<sənin-domenin>/actuator/health`
+- ünvan: `https://<sənin-domenin>/actuator/health/liveness` (yalnız liveness: health və readiness bazanı oyadır, Neon-un pulsuz saatlarını tükədir)
 - müddət: 5 dəqiqə, "keyword" yoxlaması: `UP`
 - bildiriş: e-poçt və ya Telegram
 Qeyd: Codespaces-in özəl portuna kənardan çatmaq olmur, bu yalnız deploydan sonra işləyir.

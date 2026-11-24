@@ -22,6 +22,7 @@ com/barber/booking/MigrationTests.class
 com/barber/booking/AccountSeedTests.class
 com/barber/booking/DeployConfigTests.class
 com/barber/booking/LoginTests.class
+com/barber/booking/RenderBlueprintTests.class
 com/barber/booking/PagesTests.class
 com/barber/booking/RateLimitFilterTests.class
 com/barber/booking/DbErrorHandlerTests.class

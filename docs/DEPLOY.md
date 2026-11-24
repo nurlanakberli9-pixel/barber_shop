@@ -40,3 +40,11 @@ Rate limiting IP-yə görə işləyir. Platforma proxy-si IP-ni `X-Forwarded-For
 - Admin parolunu dəyişdirən ekran yoxdur. Dəyişmək üçün: bazada admin sətrini sil (`delete from app_user where role = 'ADMIN'`), yeni `ADMIN_PASSWORD` ilə yenidən başlat. Parolu menecerdə saxla.
 - Limitlər yaddaşdadır: restartda sıfırlanır, bir neçə nüsxə işləsə hər birində ayrıdır.
 - Boş qalanda yuxuya gedən pulsuz planlarda push bildirişi və ilk sorğu gecikə bilər.
+
+## Render və Neon (pulsuz plan)
+- Tətbiq: Render web service (Docker, free, Frankfurt). Baza: Neon Postgres (free, Frankfurt).
+- `render.yaml` Blueprint-dir. Gizli dəyişənlər `sync: false` ilə Render panelində soruşulur.
+- Neon-da "Connection pooling" söndürülmüş (birbaşa) ünvan işlət, hostunda `-pooler` olan yox.
+- Uptime monitorunu YALNIZ `/actuator/health/liveness` ünvanına qur. `health` və `readiness` bazanı yoxlayır, hər 5 dəqiqəlik sorğu Neon-u oyaq saxlayıb pulsuz hesablama saatlarını tükədər.
+- Render pulsuz planı 15 dəqiqə sorğu olmayanda yuxuya gedir. Monitor sorğuları onu oyaq saxlayır. Aylıq 750 saat bir servis üçün kifayətdir, ikinci pulsuz servis əlavə etmə.
+- Pullu keçid: Render Starter (yuxu yoxdur) və Neon ödənişli plan (istifadəyə görə). Kodda dəyişiklik lazım deyil, yalnız plan dəyişir.

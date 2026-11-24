@@ -22,6 +22,7 @@
 /workspaces/barber_shop/src/test/java/com/barber/booking/PushTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RateLimitFilterTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RateLimiterTests.java
+/workspaces/barber_shop/src/test/java/com/barber/booking/RenderBlueprintTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RequestIdIntegrationTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/RequestLogFilterTests.java
 /workspaces/barber_shop/src/test/java/com/barber/booking/SecurityHeadersTests.java
